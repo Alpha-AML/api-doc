@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alpha AML — API Reference</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0f1117;
+      --sidebar:   #161b27;
+      --card:      #161b27;
+      --border:    #1e2535;
+      --border2:   #2d3a50;
+      --accent:    #7c9eff;
+      --accent-dim:#a5b4fc;
+      --text:      #e2e8f0;
+      --muted:     #94a3b8;
+      --muted2:    #64748b;
+      --code-bg:   #0d1117;
+      --green:     #4ade80;
+      --red:       #f87171;
+      --yellow:    #facc15;
+      --blue:      #7c9eff;
+      --purple:    #c084fc;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent-dim); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── sidebar ── */
+    .sidebar {
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      width: 252px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border2) transparent;
+    }
+
+    .sidebar-logo {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex-shrink: 0;
+    }
+
+    .logo-mark {
+      width: 24px; height: 24px;
+      flex-shrink: 0;
+    }
+
+    .logo-mark img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .logo-text {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -.01em;
+    }
+
+    .logo-text span { color: var(--accent); font-weight: 800; }
+
+    .project-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      padding: 10px 10px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .project-tab {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all .15s;
+      user-select: none;
+    }
+
+    .project-tab:hover { color: var(--text); background: rgba(255,255,255,.03); }
+
+    .project-tab.active {
+      color: var(--text);
+      background: rgba(124,158,255,.1);
+      border-color: rgba(124,158,255,.2);
+    }
+
+    .project-tab .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted2);
+      flex-shrink: 0;
+      transition: background .15s;
+    }
+
+    .project-tab.active .dot { background: var(--accent); }
+
+    .sidebar-nav { flex: 1; overflow-y: auto; padding: 8px 0 24px; }
+
+    .nav-project { display: none; }
+    .nav-project.active { display: block; }
+
+    .nav-group {
+      padding: 12px 20px 4px;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--border2);
+    }
+
+    .sidebar-nav a {
+      display: block;
+      padding: 6px 20px;
+      font-size: 13px;
+      color: var(--muted);
+      border-left: 2px solid transparent;
+      transition: all .15s;
+    }
+
+    .sidebar-nav a:hover,
+    .sidebar-nav a.active {
+      color: var(--text);
+      border-left-color: var(--accent);
+      background: rgba(124,158,255,.06);
+      text-decoration: none;
+    }
+
+    /* ── content ── */
+    .content {
+      margin-left: 252px;
+      max-width: 960px;
+      padding: 48px 48px 80px;
+    }
+
+    .project-section { display: none; }
+    .project-section.active { display: block; }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 8px;
+      letter-spacing: -.02em;
+    }
+
+    h2 {
+      font-size: 19px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 44px 0 14px;
+      letter-spacing: -.01em;
+    }
+
+    h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 26px 0 10px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+    }
+
+    p { color: var(--muted); margin-bottom: 12px; font-size: 14px; }
+    .subtitle { font-size: 15px; color: var(--muted2); margin-bottom: 28px; }
+
+    .endpoint-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 22px;
+    }
+
+    .method {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .5px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      font-family: monospace;
+    }
+
+    .method.get  { background: rgba(76,175,120,.12); color: #4caf78; border: 1px solid rgba(76,175,120,.2); }
+    .method.post { background: rgba(90,156,248,.1); color: #5a9cf8; border: 1px solid rgba(90,156,248,.18); }
+
+    .ep-path {
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 13.5px;
+      color: var(--text);
+    }
+
+    .params-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin-bottom: 22px;
+    }
+
+    .params-table th {
+      text-align: left;
+      padding: 8px 12px;
+      background: var(--card);
+      color: var(--muted2);
+      font-weight: 600;
+      font-size: 10px;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .params-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .params-table tr:last-child td { border-bottom: none; }
+
+    .param-name { font-family: monospace; color: var(--accent-dim); font-size: 12.5px; }
+    .param-type { font-family: monospace; color: var(--muted2); font-size: 11.5px; }
+
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 3px;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
+
+    .badge-required { background: #2d1b1b; color: var(--red); border: 1px solid rgba(248,113,113,.2); }
+    .badge-optional { background: #1a2433; color: var(--muted2); border: 1px solid var(--border); }
+
+    .curl-wrap {
+      position: relative;
+      margin-bottom: 22px;
+    }
+
+    .curl-wrap pre { margin-bottom: 0; cursor: pointer; transition: border-color .15s; }
+    .curl-wrap pre:hover { border-color: var(--accent); }
+
+    .copy-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: var(--border);
+      border: 1px solid var(--border2);
+      border-radius: 5px;
+      color: var(--muted2);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      cursor: pointer;
+      transition: all .15s;
+      letter-spacing: .4px;
+      pointer-events: none;
+    }
+
+    .curl-wrap:hover .copy-btn { color: var(--accent-dim); border-color: rgba(124,158,255,.4); }
+    .copy-btn.copied { color: var(--green); border-color: var(--green); }
+
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+      overflow-x: auto;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--text);
+      margin-bottom: 22px;
+    }
+
+    code {
+      font-family: monospace;
+      font-size: 12px;
+      background: var(--card);
+      color: var(--accent-dim);
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+    }
+
+    pre code { background: none; padding: 0; color: inherit; border: none; }
+
+    .section-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .section-box-header {
+      padding: 10px 16px;
+      background: #0f1420;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: monospace;
+    }
+
+    .obj-type { font-size: 11px; color: var(--muted2); font-weight: 400; font-family: sans-serif; }
+
+    .field {
+      display: grid;
+      grid-template-columns: 220px 110px 1fr;
+      gap: 8px;
+      padding: 9px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+      align-items: start;
+    }
+
+    .field:last-child { border-bottom: none; }
+    .field-name { font-family: monospace; color: var(--accent-dim); font-size: 12.5px; }
+    .field-type { font-family: monospace; color: var(--muted2); font-size: 11.5px; }
+    .field-desc { color: var(--muted); font-size: 12.5px; }
+
+    .status-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+
+    .status-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 13px;
+    }
+
+    .status-code {
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: 700;
+      min-width: 42px;
+      flex-shrink: 0;
+    }
+
+    .s200 { color: #4caf78; }
+    .s204 { color: var(--yellow); }
+    .s400 { color: var(--red); }
+    .s401 { color: var(--red); }
+    .s404 { color: #f97316; }
+    .s429 { color: var(--yellow); }
+    .s500 { color: var(--red); }
+
+    .status-desc { color: var(--muted); }
+
+    .note {
+      background: #141c2b;
+      border-left: 3px solid var(--accent);
+      border-radius: 0 6px 6px 0;
+      padding: 11px 15px;
+      margin-bottom: 18px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .note strong { color: var(--accent-dim); }
+
+    .divider { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+
+    .chain-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 18px; }
+    .chain-pill {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px 12px;
+      font-size: 12.5px;
+      font-family: monospace;
+      color: var(--blue);
+    }
+
+    /* risk grade badges */
+    .rg-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0 20px; }
+
+    .rg-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: monospace;
+      border: 1px solid;
+    }
+
+    .rg-very-low  { background: rgba(76,175,120,.08); color: #4caf78; border-color: rgba(76,175,120,.2); }
+    .rg-low       { background: rgba(232,184,75,.08); color: #e8b84b; border-color: rgba(232,184,75,.2); }
+    .rg-high      { background: rgba(249,115,22,.1);  color: #f97316; border-color: rgba(249,115,22,.2); }
+    .rg-very-high { background: rgba(224,82,82,.1);   color: #e05252; border-color: rgba(224,82,82,.2); }
+
+    .json-key  { color: var(--accent-dim); }
+    .json-str  { color: #6fcf97; }
+    .json-num  { color: #f97316; }
+    .json-bool { color: var(--purple); }
+    .json-null { color: var(--muted2); }
+
+    .slug { font-family: monospace; color: var(--accent-dim); font-size: 12.5px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════ SIDEBAR ═══════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-mark"><img src="../icon-light.png" alt="Alpha AML" /></div>
+    <span class="logo-text"><span>Alpha</span> AML</span>
+    <span style="margin-left:auto;font-size:11px;color:var(--muted2);font-weight:500;">API</span>
+  </div>
+
+  <div class="project-tabs">
+    <div class="project-tab active" data-project="pdf">
+      <span class="dot"></span> Risk Score
+    </div>
+    <div class="project-tab" data-project="riskgrade">
+      <span class="dot"></span> Risk Grade
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+
+    <!-- pdf nav -->
+    <div class="nav-project active" data-nav="pdf">
+      <div class="nav-group">Overview</div>
+      <a href="#p-intro">Introduction</a>
+      <a href="#p-base-url">Base URL</a>
+      <div class="nav-group">Endpoints</div>
+      <a href="#p-service">GET /api-v2/report-v1</a>
+      <a href="#p-upstream">GET /api/report-v1</a>
+      <div class="nav-group">Reference</div>
+      <a href="#p-errors">Error Reference</a>
+      <a href="#p-example-response">Example Response</a>
+    </div>
+
+    <!-- risk grade nav -->
+    <div class="nav-project" data-nav="riskgrade">
+      <div class="nav-group">Overview</div>
+      <a href="#r-intro">Introduction</a>
+      <a href="#r-base-url">Base URL</a>
+      <div class="nav-group">Endpoints</div>
+      <a href="#r-get-riskgrade">GET /api/risk-grade</a>
+      <div class="nav-group">Reference</div>
+      <a href="#r-grade-values">Grade Values</a>
+      <a href="#r-errors">Error Reference</a>
+    </div>
+
+  </nav>
+</aside>
+
+<!-- ═══════════════════ CONTENT ═══════════════════ -->
+<main class="content">
+
+  <!-- ════ PDF GENERATOR ════ -->
+  <div class="project-section active" data-content="pdf">
+
+    <section id="p-intro">
+      <h1>Risk Score API</h1>
+      <p class="subtitle">Fetches wallet risk data from the Alpha AML upstream API, renders it into a styled HTML report, and converts it to PDF via headless Chromium (Playwright).</p>
+    </section>
+
+    <section id="p-base-url">
+      <h2>Base URL</h2>
+      <pre>https://api-v3.alpha-aml.com</pre>
+    </section>
+
+    <hr class="divider" />
+
+    <section id="p-service">
+      <h2>GET /api-v2/report-v1</h2>
+      <p>Returns a PDF AML risk report for the given wallet address and chain.</p>
+      <div class="endpoint-bar">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api-v2/report-v1?address={address}&amp;chain={chain}</span>
+      </div>
+
+      <h3>Query Parameters</h3>
+      <table class="params-table">
+        <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">address</span><span class="badge badge-required">required</span></td>
+            <td><span class="param-type">string</span></td>
+            <td>Wallet address to check. Blank or missing → <code>400</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">chain</span><span class="badge badge-optional">optional</span></td>
+            <td><span class="param-type">string</span></td>
+            <td>Blockchain the address belongs to. If omitted, upstream API attempts auto-detection.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Supported chain values:</p>
+      <div class="chain-list">
+        <span class="chain-pill">ETH</span>
+        <span class="chain-pill">ARB</span>
+        <span class="chain-pill">BASE</span>
+        <span class="chain-pill">BSC</span>
+        <span class="chain-pill">TRON</span>
+      </div>
+
+      <h3>Response</h3>
+      <table class="params-table">
+        <thead><tr><th>Status</th><th>Content-Type</th><th>Body</th></tr></thead>
+        <tbody>
+          <tr><td><span class="status-code s200">200</span></td><td><code>application/pdf</code></td><td>Generated PDF bytes. Header: <code>Content-Disposition: attachment; filename="aml-report-&lt;address&gt;.pdf"</code>.</td></tr>
+          <tr><td><span class="status-code s400">400</span></td><td>—</td><td>Empty body. <code>address</code> is missing or blank.</td></tr>
+          <tr><td><span class="status-code s404">404</span></td><td><code>text/plain</code></td><td><code>Address not exist: &lt;address&gt;</code></td></tr>
+          <tr><td><span class="status-code s500">500</span></td><td><code>text/plain</code></td><td><code>Some error occurred while generating PDF. Contact to: support@alphaaml.com</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>curl Examples</h3>
+      <div class="curl-wrap">
+        <pre>curl "https://api-v3.alpha-aml.com/api-v2/report-v1?address=0x7f367cc41522ce07553e823bf3be79a889debe1b&chain=ETH" \
+  -o aml-report.pdf</pre>
+        <span class="copy-btn">COPY</span>
+      </div>
+      <div class="curl-wrap">
+        <pre>curl "https://api-v3.alpha-aml.com/api-v2/report-v1?address=TXyz1234567890abcdefgh&chain=TRON" \
+  -o aml-report.pdf</pre>
+        <span class="copy-btn">COPY</span>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <section id="p-upstream">
+      <h2>GET /api/report-v1</h2>
+      <p>Called internally via <code>DataApiService</code> (Retrofit). <strong>Not</strong> exposed to external clients — our service proxies and converts the JSON to PDF.</p>
+      <div class="endpoint-bar">
+        <span class="method get">GET</span>
+        <span class="ep-path">https://api-v2.alpha-aml.com/api/report-v1?address={address}&amp;chain={chain}&amp;apiKey={key}</span>
+      </div>
+
+      <h3>Query Parameters</h3>
+      <table class="params-table">
+        <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><span class="param-name">address</span><span class="badge badge-required">required</span></td><td><span class="param-type">string</span></td><td>Forwarded from our endpoint.</td></tr>
+          <tr><td><span class="param-name">chain</span><span class="badge badge-optional">optional</span></td><td><span class="param-type">string</span></td><td>Forwarded from our endpoint.</td></tr>
+          <tr><td><span class="param-name">apiKey</span><span class="badge badge-required">required</span></td><td><span class="param-type">string</span></td><td>Long-lived API key injected server-side. Never supplied by callers of our endpoint.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Response Fields (200 OK JSON)</h3>
+      <div class="section-box">
+        <div class="section-box-header">JSON body consumed by <code>AMLReportGenerator</code></div>
+        <div class="field"><span class="field-name">report.generated_at_utc</span><span class="field-type">string</span><span class="field-desc">Timestamp the upstream report was generated (shown in PDF header).</span></div>
+        <div class="field"><span class="field-name">wallet.address / .blockchain / .description / .entity_tag</span><span class="field-type">string</span><span class="field-desc">Address, chain, entity description, and tag shown in the report header.</span></div>
+        <div class="field"><span class="field-name">risk_assessment.score / .score_max</span><span class="field-type">number</span><span class="field-desc">Numeric risk score and its scale (e.g. 85 / 100).</span></div>
+        <div class="field"><span class="field-name">risk_assessment.risk_level</span><span class="field-type">string</span><span class="field-desc">Tier label: <code>VERY LOW RISK</code> / <code>LOW RISK</code> / <code>HIGH RISK</code> / <code>VERY HIGH RISK</code>.</span></div>
+        <div class="field"><span class="field-name">risk_assessment.blacklisted / .blacklist_note</span><span class="field-type">boolean / string</span><span class="field-desc">Blacklist flag and human-readable note.</span></div>
+        <div class="field"><span class="field-name">risk_assessment.score_zones[]</span><span class="field-type">array</span><span class="field-desc"><code>{ label, range_min, range_max }</code> — drives the gauge legend zones.</span></div>
+        <div class="field"><span class="field-name">token_balances[]</span><span class="field-type">array</span><span class="field-desc">Token balance table (ERC-20 / TRC-20).</span></div>
+        <div class="field"><span class="field-name">wallet_statistics.*</span><span class="field-type">object</span><span class="field-desc">Tx counts, first/last tx timestamps, <code>wallet_age_days</code>, <code>status</code>, stablecoin inflow/outflow/turnover.</span></div>
+        <div class="field"><span class="field-name">funded_by_entity_type_distribution[]</span><span class="field-type">array</span><span class="field-desc"><code>{ label, percentage }</code> — entity-type funding breakdown.</span></div>
+        <div class="field"><span class="field-name">risk_factors.blacklists.status</span><span class="field-type">string</span><span class="field-desc"><code>blacklisted</code> → LISTED, <code>reported</code> → FLAGGED, else CLEAR.</span></div>
+        <div class="field"><span class="field-name">risk_factors.reported_connected_addresses[]</span><span class="field-type">array</span><span class="field-desc">Connected addresses with hop counts and blacklist status.</span></div>
+      </div>
+    </section>
+
+    <hr class="divider" />
+
+    <section id="p-errors">
+      <h2>Error Reference</h2>
+      <table class="params-table">
+        <thead><tr><th>Status</th><th>Trigger</th><th>Body</th></tr></thead>
+        <tbody>
+          <tr><td><span class="status-code s400">400</span></td><td><code>address</code> param missing or blank</td><td><em>(empty)</em></td></tr>
+          <tr><td><span class="status-code s404">404</span></td><td>Upstream call failed (non-2xx) or returned empty body</td><td><code>text/plain</code>: Address not exist: &lt;address&gt;</td></tr>
+          <tr><td><span class="status-code s500">500</span></td><td>Upstream data OK but Playwright/Chromium failed to render PDF</td><td><code>text/plain</code>: Some error occurred while generating PDF. Contact to: support@alphaaml.com</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="divider" />
+
+    <section id="p-example-response">
+      <h2>Example Upstream Response</h2>
+      <pre>{
+  <span class="json-key">"report"</span>: { <span class="json-key">"generated_at_utc"</span>: <span class="json-str">"2026-05-25T18:13:44Z"</span> },
+  <span class="json-key">"wallet"</span>: {
+    <span class="json-key">"address"</span>: <span class="json-str">"0x7f367cc41522ce07553e823bf3be79a889debe1b"</span>,
+    <span class="json-key">"blockchain"</span>: <span class="json-str">"ETHEREUM"</span>,
+    <span class="json-key">"description"</span>: <span class="json-str">"Wu Huihui (DPRK OTC - ETH)"</span>,
+    <span class="json-key">"entity_tag"</span>: <span class="json-str">"Mixer addresses"</span>
+  },
+  <span class="json-key">"risk_assessment"</span>: {
+    <span class="json-key">"score"</span>: <span class="json-num">85</span>,
+    <span class="json-key">"score_max"</span>: <span class="json-num">100</span>,
+    <span class="json-key">"risk_level"</span>: <span class="json-str">"VERY HIGH RISK"</span>,
+    <span class="json-key">"blacklisted"</span>: <span class="json-bool">true</span>,
+    <span class="json-key">"blacklist_note"</span>: <span class="json-str">"Direct blacklist match found"</span>
+  },
+  <span class="json-key">"wallet_statistics"</span>: {
+    <span class="json-key">"total_transactions_count"</span>: <span class="json-num">8</span>,
+    <span class="json-key">"wallet_age_days"</span>: <span class="json-num">1858</span>,
+    <span class="json-key">"status"</span>: <span class="json-str">"INACTIVE"</span>
+  }
+}</pre>
+    </section>
+
+  </div>
+
+  <!-- ════ RISK GRADE ════ -->
+  <div class="project-section" data-content="riskgrade">
+
+    <section id="r-intro">
+      <h1>Risk Grade API</h1>
+      <p class="subtitle">Fast, API-key authenticated risk grade for any on-chain wallet address. Returns a single grade value indicating the address's risk tier.</p>
+      <div class="note"><strong>Note:</strong> The <code>time</code> field in responses is a Unix timestamp (seconds) indicating when the risk grade was last computed for the given address.</div>
+    </section>
+
+    <section id="r-base-url">
+      <h2>Base URL</h2>
+      <pre>https://api.alpha-aml.com</pre>
+    </section>
+
+    <hr class="divider" />
+
+    <section id="r-get-riskgrade">
+      <h2>GET /api/risk-grade</h2>
+      <p>Returns the current risk grade for a wallet address.</p>
+      <div class="endpoint-bar">
+        <span class="method get">GET</span>
+        <span class="ep-path">/api/risk-grade?address={address}&amp;apiKey={key}</span>
+      </div>
+
+      <h3>Query Parameters</h3>
+      <table class="params-table">
+        <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">address</span><span class="badge badge-required">required</span></td>
+            <td><span class="param-type">string</span></td>
+            <td>Wallet address to grade. Must be a valid on-chain address. Missing → <code>{"error":"Address is required"}</code>.</td>
+          </tr>
+          <tr>
+            <td><span class="param-name">apiKey</span><span class="badge badge-required">required</span></td>
+            <td><span class="param-type">string</span></td>
+            <td>API key for authentication. Missing or invalid → <code>{"error":"Unauthorized"}</code>.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>curl Example</h3>
+      <div class="curl-wrap">
+        <pre>curl "https://api.alpha-aml.com/api/risk-grade?address=0xd7632A8A3dC9287Ea25d2903df0cFb8702C49572&apiKey=&lt;key&gt;"</pre>
+        <span class="copy-btn">COPY</span>
+      </div>
+
+      <h3>Success Response (200)</h3>
+      <div class="section-box">
+        <div class="section-box-header">{ address, riskGrade, status, time }</div>
+        <div class="field"><span class="field-name">address</span><span class="field-type">string</span><span class="field-desc">The queried wallet address (echo).</span></div>
+        <div class="field"><span class="field-name">riskGrade</span><span class="field-type">string</span><span class="field-desc">Risk tier. One of: <code>very-low</code>, <code>low</code>, <code>high</code>, <code>very-high</code>.</span></div>
+        <div class="field"><span class="field-name">status</span><span class="field-type">string</span><span class="field-desc"><code>"success"</code> on a valid result.</span></div>
+        <div class="field"><span class="field-name">time</span><span class="field-type">integer</span><span class="field-desc">Unix timestamp (seconds) indicating when this risk grade was last computed for the address.</span></div>
+      </div>
+
+      <pre>{
+  <span class="json-key">"address"</span>: <span class="json-str">"0xd7632A8A3dC9287Ea25d2903df0cFb8702C49572"</span>,
+  <span class="json-key">"riskGrade"</span>: <span class="json-str">"very-low"</span>,
+  <span class="json-key">"status"</span>: <span class="json-str">"success"</span>,
+  <span class="json-key">"time"</span>: <span class="json-num">1751500800</span>
+}</pre>
+    </section>
+
+    <hr class="divider" />
+
+    <section id="r-grade-values">
+      <h2>Grade Values</h2>
+      <p>The <code>riskGrade</code> field carries one of four tiers:</p>
+      <div class="rg-list">
+        <div class="rg-pill rg-very-low">very-low</div>
+        <div class="rg-pill rg-low">low</div>
+        <div class="rg-pill rg-high">high</div>
+        <div class="rg-pill rg-very-high">very-high</div>
+      </div>
+      <table class="params-table">
+        <thead><tr><th>Grade</th><th>Interpretation</th></tr></thead>
+        <tbody>
+          <tr><td><code>very-low</code></td><td>Address has very low risk exposure — minimal suspicious activity detected.</td></tr>
+          <tr><td><code>low</code></td><td>Address has low risk — some indirect exposure but generally clean.</td></tr>
+          <tr><td><code>high</code></td><td>Address has high risk — notable exposure to flagged counterparties or patterns.</td></tr>
+          <tr><td><code>very-high</code></td><td>Address has very high risk — direct blacklist match or severe exposure.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <hr class="divider" />
+
+    <section id="r-errors">
+      <h2>Error Reference</h2>
+      <p>All errors return a JSON body with an <code>error</code> field.</p>
+      <table class="params-table">
+        <thead><tr><th>Error body</th><th>Trigger</th><th>HTTP Status</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>{"error":"Unauthorized"}</code></td>
+            <td>Missing, invalid, or expired <code>apiKey</code></td>
+            <td><span class="status-code s401">401</span></td>
+          </tr>
+          <tr>
+            <td><code>{"error":"Address is required"}</code></td>
+            <td><code>address</code> parameter is missing or empty</td>
+            <td><span class="status-code s400">400</span></td>
+          </tr>
+          <tr>
+            <td><code>{"error":"Unsupported address format"}</code></td>
+            <td><code>address</code> provided but not a valid on-chain address format</td>
+            <td><span class="status-code s400">400</span></td>
+          </tr>
+          <tr>
+            <td><code>{"error":"Rate limit exceeded"}</code></td>
+            <td>API key quota exhausted</td>
+            <td><span class="status-code s429">429</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Error Response Examples</h3>
+      <div class="curl-wrap">
+        <pre>// Unauthorized
+{ <span class="json-key">"error"</span>: <span class="json-str">"Unauthorized"</span> }
+
+// Missing address
+{ <span class="json-key">"error"</span>: <span class="json-str">"Address is required"</span> }
+
+// Bad format
+{ <span class="json-key">"error"</span>: <span class="json-str">"Unsupported address format"</span> }
+
+// Rate limited
+{ <span class="json-key">"error"</span>: <span class="json-str">"Rate limit exceeded"</span> }</pre>
+        <span class="copy-btn">COPY</span>
+      </div>
+    </section>
+
+  </div>
+
+</main>
+
+<script>
+  const tabs = document.querySelectorAll('.project-tab');
+  const navs = document.querySelectorAll('.nav-project');
+  const sections = document.querySelectorAll('.project-section');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const project = tab.dataset.project;
+      tabs.forEach(t => t.classList.remove('active'));
+      navs.forEach(n => n.classList.remove('active'));
+      sections.forEach(s => s.classList.remove('active'));
+      tab.classList.add('active');
+      document.querySelector(`.nav-project[data-nav="${project}"]`).classList.add('active');
+      document.querySelector(`.project-section[data-content="${project}"]`).classList.add('active');
+      window.scrollTo({ top: 0, behavior: 'instant' });
+    });
+  });
+
+  const allNavLinks = document.querySelectorAll('.sidebar-nav a');
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const id = entry.target.id;
+        allNavLinks.forEach(a => {
+          a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+        });
+      }
+    });
+  }, { rootMargin: '-20% 0px -70% 0px', threshold: 0 });
+
+  document.querySelectorAll('section[id]').forEach(s => observer.observe(s));
+
+  document.querySelectorAll('.curl-wrap').forEach(wrap => {
+    const pre = wrap.querySelector('pre');
+    const btn = wrap.querySelector('.copy-btn');
+    const doCopy = () => {
+      const text = pre.innerText.trim();
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'COPIED';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 1800);
+      }).catch(() => {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        btn.textContent = 'COPIED'; btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'COPY'; btn.classList.remove('copied'); }, 1800);
+      });
+    };
+    pre.addEventListener('click', doCopy);
+    btn.addEventListener('click', doCopy);
+  });
+</script>
+
+</body>
+</html>
