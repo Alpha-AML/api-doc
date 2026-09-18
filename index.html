@@ -466,9 +466,9 @@
       <a href="#p-intro">Introduction</a>
       <a href="#p-base-url">Base URL</a>
       <div class="nav-group">Endpoints</div>
-      <a href="#p-service">GET /api-v2/report-v1</a>
-      <a href="#p-service-tx">GET /api-v2/report-by-tx-v1</a>
-      <a href="#p-upstream">GET /api/report-v1</a>
+      <a href="#p-service">GET /api/report/wallet</a>
+      <a href="#p-service-tx">GET /api/report/txhash</a>
+      <a href="#p-upstream">GET /api/engine/report-v1</a>
       <div class="nav-group">Reference</div>
       <a href="#p-errors">Error Reference</a>
       <a href="#p-example-response">Example Response</a>
@@ -480,7 +480,7 @@
       <a href="#r-intro">Introduction</a>
       <a href="#r-base-url">Base URL</a>
       <div class="nav-group">Endpoints</div>
-      <a href="#r-get-riskgrade">GET /api/risk-grade</a>
+      <a href="#r-get-riskgrade">GET /api/engine/risk-grade</a>
       <div class="nav-group">Reference</div>
       <a href="#r-grade-values">Grade Values</a>
       <a href="#r-errors">Error Reference</a>
@@ -502,18 +502,29 @@
 
     <section id="p-base-url">
       <h2>Base URL</h2>
-      <pre>https://api-v3.alpha-aml.com</pre>
+      <pre>https://api.alpha-aml.com</pre>
     </section>
 
     <hr class="divider" />
 
     <section id="p-service">
-      <h2>GET /api-v2/report-v1</h2>
+      <h2>GET /api/report/wallet</h2>
       <p>Returns a PDF AML risk report for the given wallet address and chain.</p>
       <div class="endpoint-bar">
         <span class="method get">GET</span>
-        <span class="ep-path">/api-v2/report-v1?address={address}&amp;chain={chain}</span>
+        <span class="ep-path">/api/report/wallet?address={address}&amp;chain={chain}</span>
       </div>
+
+      <h3>Headers</h3>
+      <table class="params-table">
+        <thead><tr><th>Header</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">X-apikey</span><span class="badge badge-required">required</span></td>
+            <td>Caller JWT. Per-key rate limits apply (10/s, 100/min, 2000/day). <strong>Not</strong> a query parameter — sending it as <code>?apiKey=</code> no longer works.</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h3>Query Parameters</h3>
       <table class="params-table">
@@ -528,11 +539,6 @@
             <td><span class="param-name">chain</span><span class="badge badge-optional">optional</span></td>
             <td><span class="param-type">string</span></td>
             <td>Blockchain the address belongs to. If omitted, upstream API attempts auto-detection. When supplied, an address whose family does not match the chain is rejected with <code>UNSUPPORTED_CHAIN</code>.</td>
-          </tr>
-          <tr>
-            <td><span class="param-name">apiKey</span><span class="badge badge-required">required</span></td>
-            <td><span class="param-type">string</span></td>
-            <td>Caller JWT. Per-key rate limits apply (10/s, 100/min, 2000/day).</td>
           </tr>
         </tbody>
       </table>
@@ -552,22 +558,26 @@
         <tbody>
           <tr><td><span class="status-code s200">200</span></td><td><code>application/pdf</code></td><td>Generated PDF bytes. Header: <code>Content-Disposition: attachment; filename="aml-report-&lt;address&gt;.pdf"</code>.</td></tr>
           <tr><td><span class="status-code s400">400</span></td><td><code>application/json</code></td><td><code>INVALID_ADDRESS</code> (bad format), <code>UNSUPPORTED_CHAIN</code> (address family ≠ chain), <code>BAD_REQUEST</code> (missing param).</td></tr>
-          <tr><td><span class="status-code s403">403</span></td><td><code>application/json</code></td><td><code>USER_DISABLED</code>.</td></tr>
-          <tr><td><span class="status-code s404">404</span></td><td><code>application/json</code></td><td><code>USER_NOT_FOUND</code> (unknown <code>apiKey</code>), <code>ADDRESS_NOT_FOUND</code> (no upstream data).</td></tr>
+          <tr><td><span class="status-code s401">401</span></td><td><code>application/json</code></td><td>Missing or invalid <code>X-apikey</code> — rejected before this endpoint runs.</td></tr>
+          <tr><td><span class="status-code s403">403</span></td><td><code>application/json</code></td><td>Key has no access to this endpoint.</td></tr>
+          <tr><td><span class="status-code s404">404</span></td><td><code>application/json</code></td><td><code>ADDRESS_NOT_FOUND</code> — no upstream data for the address.</td></tr>
+          <tr><td><span class="status-code s429">429</span></td><td><code>application/json</code></td><td>Rate limit exceeded — <code>Retry-After</code> header and <code>retry_after_seconds</code> in the body say when to retry.</td></tr>
           <tr><td><span class="status-code s500">500</span></td><td><code>application/json</code></td><td><code>PDF_FAILED</code> — Chromium failed to render the report.</td></tr>
         </tbody>
       </table>
 
-      <div class="note"><strong>Errors</strong> are returned as JSON — <code>{ "error": { "code", "field", "message" } }</code> — while a successful call still returns the raw PDF. See the <a href="#p-errors">Error Reference</a> for all codes.</div>
+      <div class="note"><strong>App-level errors</strong> (400/404/500) are JSON — <code>{ "error": { "code", "field", "message" } }</code>. <strong>Auth/rate-limit errors</strong> (401/403/429) come from the SDK layer before the request reaches this endpoint. Every response — success or error — carries an <code>X-Request-Id</code> header for tracing. A successful call still returns the raw PDF. See the <a href="#p-errors">Error Reference</a> for app-level codes.</div>
 
       <h3>curl Examples</h3>
       <div class="curl-wrap">
-        <pre>curl "https://api-v3.alpha-aml.com/api-v2/report-v1?address=0x7f367cc41522ce07553e823bf3be79a889debe1b&chain=ETH&apiKey=&lt;key&gt;" \
+        <pre>curl -H "X-apikey: &lt;key&gt;" \
+  "https://api.alpha-aml.com/api/report/wallet?address=0x7f367cc41522ce07553e823bf3be79a889debe1b&chain=ETH" \
   -o aml-report.pdf</pre>
         <span class="copy-btn">COPY</span>
       </div>
       <div class="curl-wrap">
-        <pre>curl "https://api-v3.alpha-aml.com/api-v2/report-v1?address=TXyz1234567890abcdefgh&chain=TRON&apiKey=&lt;key&gt;" \
+        <pre>curl -H "X-apikey: &lt;key&gt;" \
+  "https://api.alpha-aml.com/api/report/wallet?address=TXyz1234567890abcdefgh&chain=TRON" \
   -o aml-report.pdf</pre>
         <span class="copy-btn">COPY</span>
       </div>
@@ -576,12 +586,23 @@
     <hr class="divider" />
 
     <section id="p-service-tx">
-      <h2>GET /api-v2/report-by-tx-v1</h2>
-      <p>Resolves a transaction hash to a single transfer, then returns JSON risk metadata for both parties of that transfer. <strong>This endpoint does not generate a PDF</strong> — use <a href="#p-service"><code>/api-v2/report-v1</code></a> with the returned <code>sender</code> / <code>receiver</code> for the styled report.</p>
+      <h2>GET /api/report/txhash</h2>
+      <p>Resolves a transaction hash to a single transfer, then returns JSON risk metadata for both parties of that transfer. <strong>This endpoint does not generate a PDF</strong> — use <a href="#p-service"><code>/api/report/wallet</code></a> with the returned <code>sender</code> / <code>receiver</code> for the styled report.</p>
       <div class="endpoint-bar">
         <span class="method get">GET</span>
-        <span class="ep-path">/api-v2/report-by-tx-v1?txHash={txHash}&amp;chain={chain}&amp;apiKey={key}</span>
+        <span class="ep-path">/api/report/txhash?txHash={txHash}&amp;chain={chain}</span>
       </div>
+
+      <h3>Headers</h3>
+      <table class="params-table">
+        <thead><tr><th>Header</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">X-apikey</span><span class="badge badge-required">required</span></td>
+            <td>Caller JWT. Per-key rate limits apply (10/s, 100/min, 2000/day). <strong>Not</strong> a query parameter — sending it as <code>?apiKey=</code> no longer works.</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h3>Query Parameters</h3>
       <table class="params-table">
@@ -589,7 +610,6 @@
         <tbody>
           <tr><td><span class="param-name">txHash</span><span class="badge badge-required">required</span></td><td><span class="param-type">string</span></td><td>Transaction hash. EVM chains: <code>0x</code> + 64 hex. TRON: 64 hex, no <code>0x</code>. Wrong shape for the chain → <code>INVALID_TX_HASH</code>.</td></tr>
           <tr><td><span class="param-name">chain</span><span class="badge badge-required">required</span></td><td><span class="param-type">string</span></td><td>Chain to resolve the transaction on. One of the supported values below.</td></tr>
-          <tr><td><span class="param-name">apiKey</span><span class="badge badge-required">required</span></td><td><span class="param-type">string</span></td><td>Caller JWT. Per-key rate limits apply (10/s, 100/min, 2000/day).</td></tr>
           <tr><td><span class="param-name">event_index</span><span class="badge badge-optional">optional</span></td><td><span class="param-type">integer</span></td><td>Filter: keep only the token transfer whose log index equals this value (the number shown under a transaction's event logs on a block explorer). Native transfers have no log index.</td></tr>
           <tr><td><span class="param-name">token_contract</span><span class="badge badge-optional">optional</span></td><td><span class="param-type">string</span></td><td>Filter: keep only token transfers of this contract address.</td></tr>
           <tr><td><span class="param-name">sender</span><span class="badge badge-optional">optional</span></td><td><span class="param-type">string</span></td><td>Filter / assertion: keep only transfers sent <em>from</em> this address.</td></tr>
@@ -627,9 +647,11 @@
         <tbody>
           <tr><td><span class="status-code s200">200</span></td><td><code>application/json</code></td><td>Transfer metadata + risk scores (fields below).</td></tr>
           <tr><td><span class="status-code s400">400</span></td><td><code>application/json</code></td><td><code>INVALID_TX_HASH</code>, <code>UNSUPPORTED_CHAIN</code>, <code>INVALID_ADDRESS</code>, <code>BAD_REQUEST</code>.</td></tr>
-          <tr><td><span class="status-code s403">403</span></td><td><code>application/json</code></td><td><code>USER_DISABLED</code>.</td></tr>
-          <tr><td><span class="status-code s404">404</span></td><td><code>application/json</code></td><td><code>UNKNOWN_HASH</code>, <code>USER_NOT_FOUND</code>, <code>ADDRESS_NOT_FOUND</code>.</td></tr>
+          <tr><td><span class="status-code s401">401</span></td><td><code>application/json</code></td><td>Missing or invalid <code>X-apikey</code> — rejected before this endpoint runs.</td></tr>
+          <tr><td><span class="status-code s403">403</span></td><td><code>application/json</code></td><td>Key has no access to this endpoint.</td></tr>
+          <tr><td><span class="status-code s404">404</span></td><td><code>application/json</code></td><td><code>UNKNOWN_HASH</code>, <code>ADDRESS_NOT_FOUND</code>.</td></tr>
           <tr><td><span class="status-code s409">409</span></td><td><code>application/json</code></td><td><code>PENDING_TRANSACTION</code>, <code>TRANSACTION_FAILED</code>, <code>NO_TRANSFERS</code>, <code>MULTIPLE_TRANSFERS</code>, <code>NO_MATCH</code>.</td></tr>
+          <tr><td><span class="status-code s429">429</span></td><td><code>application/json</code></td><td>Rate limit exceeded — <code>Retry-After</code> header and <code>retry_after_seconds</code> in the body say when to retry.</td></tr>
           <tr><td><span class="status-code s502">502</span></td><td><code>application/json</code></td><td><code>RPC_ERROR</code> — RPC provider unreachable or returned an error.</td></tr>
         </tbody>
       </table>
@@ -637,15 +659,16 @@
       <h3>Response Fields (200 OK JSON)</h3>
       <div class="section-box">
         <div class="section-box-header">application/json <span class="obj-type">— transfer metadata + risk scores</span></div>
+        <div class="field"><span class="field-name">version</span><span class="field-type">string</span><span class="field-desc">Response schema version (e.g. <code>"1.2.15"</code>). Constant until this endpoint's response shape changes.</span></div>
         <div class="field"><span class="field-name">hash</span><span class="field-type">string</span><span class="field-desc">The transaction hash (echo of <code>txHash</code>).</span></div>
         <div class="field"><span class="field-name">chain</span><span class="field-type">string</span><span class="field-desc">Chain the lookup ran on (echo of <code>chain</code>).</span></div>
-        <div class="field"><span class="field-name">amount_human</span><span class="field-type">string</span><span class="field-desc">Transferred amount, decimal-adjusted, trailing zeros stripped (e.g. <code>"490.14"</code>).</span></div>
+        <div class="field"><span class="field-name">amount</span><span class="field-type">string</span><span class="field-desc">Transferred amount, decimal-adjusted, trailing zeros stripped (e.g. <code>"490.14"</code>).</span></div>
         <div class="field"><span class="field-name">amount_raw</span><span class="field-type">string</span><span class="field-desc">Transferred amount in base units (wei / sun / token base units).</span></div>
         <div class="field"><span class="field-name">asset</span><span class="field-type">string</span><span class="field-desc"><code>"native"</code> for a coin transfer, otherwise the token contract address.</span></div>
-        <div class="field"><span class="field-name">decimals</span><span class="field-type">number</span><span class="field-desc">Decimals used for <code>amount_human</code> — 18 (native EVM), 6 (native TRON), or the token's own.</span></div>
+        <div class="field"><span class="field-name">decimals</span><span class="field-type">number</span><span class="field-desc">Decimals used for <code>amount</code> — 18 (native EVM), 6 (native TRON), or the token's own.</span></div>
         <div class="field"><span class="field-name">token_symbol</span><span class="field-type">string</span><span class="field-desc">Token symbol if it could be read on-chain; omitted for native transfers or when unavailable.</span></div>
         <div class="field"><span class="field-name">sender</span><span class="field-type">string</span><span class="field-desc">The selected transfer's <code>from</code> address.</span></div>
-        <div class="field"><span class="field-name">source_of_funds</span><span class="field-type">array</span><span class="field-desc"><strong>Sender only.</strong> The sender's <code>funded_by_entity_type_distribution</code> from the Alpha AML API — <code>[{ label, percentage }]</code>. Omitted if the sender has no funding data.</span></div>
+        <div class="field"><span class="field-name">funding_entity_types</span><span class="field-type">array</span><span class="field-desc"><strong>Sender only.</strong> The sender's <code>funded_by_entity_type_distribution</code> from the Alpha AML API — <code>[{ label, percentage }]</code>. Omitted if the sender has no funding data.</span></div>
         <div class="field"><span class="field-name">receiver</span><span class="field-type">string</span><span class="field-desc">The selected transfer's <code>to</code> address.</span></div>
         <div class="field"><span class="field-name">sender_risk_score</span><span class="field-type">number</span><span class="field-desc">0–100 risk score for <code>sender</code>. <code>null</code> if it could not be scored.</span></div>
         <div class="field"><span class="field-name">receiver_risk_score</span><span class="field-type">number</span><span class="field-desc">0–100 risk score for <code>receiver</code>. <code>null</code> if it could not be scored.</span></div>
@@ -653,15 +676,16 @@
 
       <h3>Example Response</h3>
       <pre>{
+  <span class="json-key">"version"</span>: <span class="json-str">"1.2.15"</span>,
   <span class="json-key">"hash"</span>: <span class="json-str">"0x3421c1fb88ab5962400c904f874ed3ba850c2121e2216433c6c8034872b48d9f"</span>,
   <span class="json-key">"chain"</span>: <span class="json-str">"eth"</span>,
-  <span class="json-key">"amount_human"</span>: <span class="json-str">"490.14"</span>,
+  <span class="json-key">"amount"</span>: <span class="json-str">"490.14"</span>,
   <span class="json-key">"amount_raw"</span>: <span class="json-str">"490140000"</span>,
   <span class="json-key">"asset"</span>: <span class="json-str">"0xdac17f958d2ee523a2206206994597c13d831ec7"</span>,
   <span class="json-key">"decimals"</span>: <span class="json-num">6</span>,
   <span class="json-key">"token_symbol"</span>: <span class="json-str">"USDT"</span>,
   <span class="json-key">"sender"</span>: <span class="json-str">"0x559432e18b281731c054cd703d4b49872be4ed53"</span>,
-  <span class="json-key">"source_of_funds"</span>: [
+  <span class="json-key">"funding_entity_types"</span>: [
     { <span class="json-key">"label"</span>: <span class="json-str">"CEX associated addresses"</span>, <span class="json-key">"percentage"</span>: <span class="json-num">4.1</span> },
     { <span class="json-key">"label"</span>: <span class="json-str">"Unknown"</span>, <span class="json-key">"percentage"</span>: <span class="json-num">95.9</span> }
   ],
@@ -672,16 +696,19 @@
 
       <h3>curl Examples</h3>
       <div class="curl-wrap">
-        <pre>curl "https://api-v3.alpha-aml.com/api-v2/report-by-tx-v1?txHash=0x3421c1fb88ab5962400c904f874ed3ba850c2121e2216433c6c8034872b48d9f&chain=ETH&apiKey=&lt;key&gt;"</pre>
+        <pre>curl -H "X-apikey: &lt;key&gt;" \
+  "https://api.alpha-aml.com/api/report/txhash?txHash=0x3421c1fb88ab5962400c904f874ed3ba850c2121e2216433c6c8034872b48d9f&chain=ETH"</pre>
         <span class="copy-btn">COPY</span>
       </div>
       <div class="curl-wrap">
         <pre># disambiguate a multi-transfer tx by event log index
-curl "https://api-v3.alpha-aml.com/api-v2/report-by-tx-v1?txHash=0x97ee11e7360dfff10a7e7f5878a5efe1bd008e913111f8224212bc5da6366489&chain=ETH&apiKey=&lt;key&gt;&event_index=63"</pre>
+curl -H "X-apikey: &lt;key&gt;" \
+  "https://api.alpha-aml.com/api/report/txhash?txHash=0x97ee11e7360dfff10a7e7f5878a5efe1bd008e913111f8224212bc5da6366489&chain=ETH&event_index=63"</pre>
         <span class="copy-btn">COPY</span>
       </div>
       <div class="curl-wrap">
-        <pre>curl "https://api-v3.alpha-aml.com/api-v2/report-by-tx-v1?txHash=e512d7f0eeeba031d9442a0ae8673a2ea1ede7d2dfe943cf86fcc0528dc4c937&chain=TRON&apiKey=&lt;key&gt;"</pre>
+        <pre>curl -H "X-apikey: &lt;key&gt;" \
+  "https://api.alpha-aml.com/api/report/txhash?txHash=e512d7f0eeeba031d9442a0ae8673a2ea1ede7d2dfe943cf86fcc0528dc4c937&chain=TRON"</pre>
         <span class="copy-btn">COPY</span>
       </div>
     </section>
@@ -689,12 +716,20 @@ curl "https://api-v3.alpha-aml.com/api-v2/report-by-tx-v1?txHash=0x97ee11e7360df
     <hr class="divider" />
 
     <section id="p-upstream">
-      <h2>GET /api/report-v1</h2>
+      <h2>GET /api/engine/report-v1</h2>
       <p>Called internally via <code>DataApiService</code> (Retrofit). <strong>Not</strong> exposed to external clients — our service proxies and converts the JSON to PDF.</p>
       <div class="endpoint-bar">
         <span class="method get">GET</span>
-        <span class="ep-path">https://api-v2.alpha-aml.com/api/report-v1?address={address}&amp;chain={chain}&amp;apiKey={key}</span>
+        <span class="ep-path">https://api.alpha-aml.com/api/engine/report-v1?address={address}&amp;chain={chain}</span>
       </div>
+
+      <h3>Headers</h3>
+      <table class="params-table">
+        <thead><tr><th>Header</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><span class="param-name">X-apikey</span><span class="badge badge-required">required</span></td><td>Long-lived API key injected server-side. Never supplied by callers of our endpoint. <strong>Not</strong> a query parameter — <code>?apiKey=</code> no longer works.</td></tr>
+        </tbody>
+      </table>
 
       <h3>Query Parameters</h3>
       <table class="params-table">
@@ -702,7 +737,6 @@ curl "https://api-v3.alpha-aml.com/api-v2/report-by-tx-v1?txHash=0x97ee11e7360df
         <tbody>
           <tr><td><span class="param-name">address</span><span class="badge badge-required">required</span></td><td><span class="param-type">string</span></td><td>Forwarded from our endpoint.</td></tr>
           <tr><td><span class="param-name">chain</span><span class="badge badge-optional">optional</span></td><td><span class="param-type">string</span></td><td>Forwarded from our endpoint.</td></tr>
-          <tr><td><span class="param-name">apiKey</span><span class="badge badge-required">required</span></td><td><span class="param-type">string</span></td><td>Long-lived API key injected server-side. Never supplied by callers of our endpoint.</td></tr>
         </tbody>
       </table>
 
@@ -727,7 +761,7 @@ curl "https://api-v3.alpha-aml.com/api-v2/report-by-tx-v1?txHash=0x97ee11e7360df
 
     <section id="p-errors">
       <h2>Error Reference</h2>
-      <p>Both <code>/api-v2</code> endpoints return errors as JSON:</p>
+      <p>Both <code>/api/report</code> endpoints return app-level errors as JSON:</p>
       <pre>{ <span class="json-key">"error"</span>: { <span class="json-key">"code"</span>: <span class="json-str">"INVALID_ADDRESS"</span>, <span class="json-key">"field"</span>: <span class="json-str">"address"</span>, <span class="json-key">"message"</span>: <span class="json-str">"Not a valid address: zzz"</span> } }</pre>
       <p><code>field</code> is present only when the error concerns a specific parameter.</p>
       <table class="params-table">
@@ -737,8 +771,6 @@ curl "https://api-v3.alpha-aml.com/api-v2/report-by-tx-v1?txHash=0x97ee11e7360df
           <tr><td><code>INVALID_ADDRESS</code></td><td><span class="status-code s400">400</span></td><td><code>address</code> / <code>sender</code> / <code>recipient</code> / <code>token_contract</code> is not a valid EVM or TRON address.</td></tr>
           <tr><td><code>UNSUPPORTED_CHAIN</code></td><td><span class="status-code s400">400</span></td><td><code>chain</code> is not supported, or an address's family does not match <code>chain</code> (e.g. a <code>T…</code> address with <code>chain=ETH</code>).</td></tr>
           <tr><td><code>INVALID_TX_HASH</code></td><td><span class="status-code s400">400</span></td><td><code>txHash</code> is not a valid hash for the requested chain.</td></tr>
-          <tr><td><code>USER_DISABLED</code></td><td><span class="status-code s403">403</span></td><td>The <code>apiKey</code> belongs to a disabled user.</td></tr>
-          <tr><td><code>USER_NOT_FOUND</code></td><td><span class="status-code s404">404</span></td><td>The <code>apiKey</code> is not recognised.</td></tr>
           <tr><td><code>UNKNOWN_HASH</code></td><td><span class="status-code s404">404</span></td><td>The RPC node does not know <code>txHash</code>.</td></tr>
           <tr><td><code>ADDRESS_NOT_FOUND</code></td><td><span class="status-code s404">404</span></td><td>The Alpha AML upstream has no data for the address.</td></tr>
           <tr><td><code>PENDING_TRANSACTION</code></td><td><span class="status-code s409">409</span></td><td>The transaction exists but is not yet mined.</td></tr>
@@ -814,12 +846,23 @@ curl "https://api-v3.alpha-aml.com/api-v2/report-by-tx-v1?txHash=0x97ee11e7360df
     <hr class="divider" />
 
     <section id="r-get-riskgrade">
-      <h2>GET /api/risk-grade</h2>
+      <h2>GET /api/engine/risk-grade</h2>
       <p>Returns the current risk grade for a wallet address.</p>
       <div class="endpoint-bar">
         <span class="method get">GET</span>
-        <span class="ep-path">/api/risk-grade?address={address}&amp;apiKey={key}</span>
+        <span class="ep-path">/api/engine/risk-grade?address={address}</span>
       </div>
+
+      <h3>Headers</h3>
+      <table class="params-table">
+        <thead><tr><th>Header</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><span class="param-name">X-apikey</span><span class="badge badge-required">required</span></td>
+            <td>API key for authentication. Missing or invalid → <code>{"error":"Unauthorized"}</code>. <strong>Not</strong> a query parameter — <code>?apiKey=</code> no longer works.</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h3>Query Parameters</h3>
       <table class="params-table">
@@ -830,17 +873,13 @@ curl "https://api-v3.alpha-aml.com/api-v2/report-by-tx-v1?txHash=0x97ee11e7360df
             <td><span class="param-type">string</span></td>
             <td>Wallet address to grade. Must be a valid on-chain address. Missing → <code>{"error":"Address is required"}</code>.</td>
           </tr>
-          <tr>
-            <td><span class="param-name">apiKey</span><span class="badge badge-required">required</span></td>
-            <td><span class="param-type">string</span></td>
-            <td>API key for authentication. Missing or invalid → <code>{"error":"Unauthorized"}</code>.</td>
-          </tr>
         </tbody>
       </table>
 
       <h3>curl Example</h3>
       <div class="curl-wrap">
-        <pre>curl "https://api.alpha-aml.com/api/risk-grade?address=0xd7632A8A3dC9287Ea25d2903df0cFb8702C49572&apiKey=&lt;key&gt;"</pre>
+        <pre>curl -H "X-apikey: &lt;key&gt;" \
+  "https://api.alpha-aml.com/api/engine/risk-grade?address=0xd7632A8A3dC9287Ea25d2903df0cFb8702C49572"</pre>
         <span class="copy-btn">COPY</span>
       </div>
 
@@ -893,7 +932,7 @@ curl "https://api-v3.alpha-aml.com/api-v2/report-by-tx-v1?txHash=0x97ee11e7360df
         <tbody>
           <tr>
             <td><code>{"error":"Unauthorized"}</code></td>
-            <td>Missing, invalid, or expired <code>apiKey</code></td>
+            <td>Missing, invalid, or expired <code>X-apikey</code> header</td>
             <td><span class="status-code s401">401</span></td>
           </tr>
           <tr>
