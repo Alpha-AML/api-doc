@@ -472,7 +472,6 @@
       <a href="#p-upstream-example">&nbsp;&nbsp;Response Example</a>
       <a href="#p-upstream-fields">&nbsp;&nbsp;Response Fields</a>
       <a href="#p-upstream-categories">&nbsp;&nbsp;Category Dictionary</a>
-      <a href="#p-upstream-breaking">&nbsp;&nbsp;Breaking Changes</a>
       <div class="nav-group">Reference</div>
       <a href="#p-errors">Error Reference</a>
       <a href="#p-example-response">Example Response</a>
@@ -721,17 +720,18 @@ curl -H "X-apikey: &lt;key&gt;" \
 
     <section id="p-upstream">
       <h2>GET /api/engine/report-v1</h2>
-      <p>Address risk report. This is the agreed integration endpoint and <strong>is</strong>
-         available to external clients with a valid key &mdash; earlier revisions of this page
-         described it as internal, which was incorrect.</p>
+      <p>Returns a full risk assessment for a single address: score, the findings behind it,
+         attribution for the address and its counterparties, and metadata describing how complete
+         and how current the analysis is.</p>
       <div class="endpoint-bar">
         <span class="method get">GET</span>
         <span class="ep-path">https://api.alpha-aml.com/api/engine/report-v1?address={address}&amp;chain={chain}</span>
       </div>
 
-      <div class="note"><strong>Model version 4.1.0.</strong> Every field below is returned by the
-        deployed build. All additions are backwards compatible; the two behaviour changes that
-        require client action are listed under <a href="#p-upstream-breaking">Breaking changes</a>.</div>
+      <div class="note"><strong>Read <code>report.status</code> before <code>risk_assessment.score</code>.</strong>
+        A score is only an assessment when <code>status</code> is <code>complete</code>; otherwise it is
+        preliminary or absent. <code>score</code> is <code>null</code> whenever
+        <code>status</code> is not <code>complete</code>.</div>
 
       <h3>Headers</h3>
       <table class="params-table">
@@ -1162,7 +1162,7 @@ curl -H "X-apikey: &lt;key&gt;" \
       </div>
 
       <div class="section-box">
-        <div class="section-box-header"><code>entity_attribution</code> &mdash; who the address belongs to <span class="obj-type">new in 4.1.0</span></div>
+        <div class="section-box-header"><code>entity_attribution</code> &mdash; who the address belongs to</div>
         <div class="field"><span class="field-name">attribution</span><span class="field-type">string</span><span class="field-desc"><code>resolved</code> or <code>none_held</code>. <strong>Branch on this.</strong> A company or person is held for a small minority of addresses, so <code>none_held</code> is the normal answer &mdash; it means none was found, not that none exists, and never that the address is clean.</span></div>
         <div class="field"><span class="field-name">note</span><span class="field-type">string</span><span class="field-desc">Plain-language restatement of the above.</span></div>
         <div class="field"><span class="field-name">entity.kind</span><span class="field-type">string</span><span class="field-desc"><code>company</code> or <code>person</code>. Present only when <code>attribution = resolved</code>.</span></div>
@@ -1180,7 +1180,7 @@ curl -H "X-apikey: &lt;key&gt;" \
       </div>
 
       <div class="section-box">
-        <div class="section-box-header"><code>jurisdiction_risk</code> &mdash; linked jurisdictions <span class="obj-type">new in 4.1.0</span></div>
+        <div class="section-box-header"><code>jurisdiction_risk</code> &mdash; linked jurisdictions</div>
         <div class="field"><span class="field-name">jurisdictions[].country</span><span class="field-type">string</span><span class="field-desc">Country linked to the address or its owner.</span></div>
         <div class="field"><span class="field-name">jurisdictions[].tier</span><span class="field-type">string</span><span class="field-desc"><code>high_risk</code>, <code>grey_risk</code>, or <code>not_listed</code>.</span></div>
         <div class="field"><span class="field-name">jurisdictions[].weight</span><span class="field-type">integer</span><span class="field-desc">Relative weight of the tier. <code>0</code> for <code>not_listed</code>.</span></div>
@@ -1193,7 +1193,7 @@ curl -H "X-apikey: &lt;key&gt;" \
       </div>
 
       <div class="section-box">
-        <div class="section-box-header"><code>related_entities</code> &mdash; named counterparties <span class="obj-type">new in 4.1.0</span></div>
+        <div class="section-box-header"><code>related_entities</code> &mdash; named counterparties</div>
         <div class="field"><span class="field-name">counterparties[].address</span><span class="field-type">string</span><span class="field-desc">The counterparty, in the network's native format.</span></div>
         <div class="field"><span class="field-name">counterparties[].direction</span><span class="field-type">string</span><span class="field-desc"><code>received_from</code> or <code>sent_to</code>.</span></div>
         <div class="field"><span class="field-name">counterparties[].name / .company / .country</span><span class="field-type">string</span><span class="field-desc">Identity of the counterparty as held.</span></div>
@@ -1208,9 +1208,9 @@ curl -H "X-apikey: &lt;key&gt;" \
       </div>
 
       <h3 id="p-upstream-categories">Category Dictionary</h3>
-      <p>Also served live at <code>GET /api/engine/categories</code>. Codes are additive: new ones may
-         appear, existing ones are never renamed or redefined. Treat an unrecognised code as
-         <code>entity_class: endpoint</code> with the severity reported alongside it.</p>
+      <p>Codes appearing in <code>category_code</code> throughout the response. Codes are additive:
+         new ones may appear, existing ones are never renamed or redefined. Treat an unrecognised
+         code as <code>entity_class: endpoint</code> with the severity reported alongside it.</p>
 
       <div class="note"><strong>The distinction that matters.</strong> An
         <code>endpoint</code> is itself the risk, and exposure propagates from it. A
@@ -1253,21 +1253,35 @@ curl -H "X-apikey: &lt;key&gt;" \
         </tbody>
       </table>
 
-      <h3 id="p-upstream-breaking">Breaking Changes in 4.1.0</h3>
-      <div class="note"><strong>1. Warm-up returns 503, not 200.</strong> For roughly 85 seconds after a
-        restart the service previously answered <code>HTTP 200</code> with <code>score: 0</code> and
-        <code>blacklisted: false</code> &mdash; indistinguishable from a clean wallet. It now returns
-        <code>503</code> with <code>Retry-After: 30</code> and
-        <code>{"status":"unavailable","reason":"CACHE_WARMING","score":null}</code>. A client treating
-        <code>200</code> as "analysed" was previously receiving a clean report during every restart.
-        Handle <code>503</code> as a retry, never as a pass.</div>
-      <div class="note"><strong>2. <code>score</code> may be <code>null</code></strong> &mdash; only when
-        <code>status != complete</code>. Clients parsing it as a primitive number must handle null.</div>
+      <h3>Status Codes</h3>
+      <table class="params-table">
+        <thead><tr><th>HTTP</th><th>Body</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><span class="status-code s200">200</span></td><td>Report</td>
+              <td>A report was produced. Read <code>report.status</code> to tell a completed
+                  analysis from a partial one.</td></tr>
+          <tr><td><span class="status-code s400">400</span></td><td><code>{ code, field, message }</code></td>
+              <td><code>INVALID_ADDRESS</code> or <code>UNSUPPORTED_CHAIN</code>. The address or
+                  network could not be accepted, so no score is returned.</td></tr>
+          <tr><td><span class="status-code s401">401</span></td><td><code>{ error, message, request_id }</code></td>
+              <td>Missing or invalid <code>X-apikey</code>.</td></tr>
+          <tr><td><span class="status-code s403">403</span></td><td><code>{ error, message, request_id }</code></td>
+              <td>The key is valid but not granted access to this endpoint.</td></tr>
+          <tr><td><span class="status-code s429">429</span></td><td><code>{ error, message, request_id }</code></td>
+              <td>Rate limit exceeded. <code>Retry-After</code> gives the wait in seconds.</td></tr>
+          <tr><td><span class="status-code s502">503</span></td><td><code>{ status, reason, score, retry_after_seconds }</code></td>
+              <td>Risk data is not loaded, so no assessment can be made.
+                  <code>status</code> is <code>unavailable</code>, <code>reason</code> is
+                  <code>CACHE_WARMING</code> and <code>score</code> is <code>null</code>.
+                  <code>Retry-After</code> gives the wait in seconds. This is not an assessment and
+                  must not be treated as one.</td></tr>
+        </tbody>
+      </table>
 
       <h3>Recommended Integration Policy</h3>
       <div class="section-box">
         <div class="section-box-header">Fail closed</div>
-        <div class="field"><span class="field-name">1</span><span class="field-type">hold</span><span class="field-desc">Any response other than <code>200</code>, any body you cannot parse, and any <code>status != "complete"</code>.</span></div>
+        <div class="field"><span class="field-name">1</span><span class="field-type">hold</span><span class="field-desc">Any response other than <code>200</code>, any body you cannot parse, and any <code>status != "complete"</code>. A missing, <code>null</code> or zero score is never a pass.</span></div>
         <div class="field"><span class="field-name">2</span><span class="field-type">block</span><span class="field-desc"><code>risk_assessment.blacklisted = true</code>, at any score.</span></div>
         <div class="field"><span class="field-name">3</span><span class="field-type">block</span><span class="field-desc"><code>risk_assessment.score &gt;= 76</code>, the start of the top band. Prefer a band boundary to an arbitrary round number.</span></div>
         <div class="field"><span class="field-name">4</span><span class="field-type">block</span><span class="field-desc"><code>wallet.entity_tag = "Smart contract"</code> on a plain transfer. Tokens sent to a token contract are unrecoverable &mdash; a loss case, not a risk case.</span></div>
