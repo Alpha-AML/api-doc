@@ -473,6 +473,7 @@
       <a href="#p-upstream-fields">&nbsp;&nbsp;Response Fields</a>
       <a href="#p-upstream-categories">&nbsp;&nbsp;Category Dictionary</a>
       <div class="nav-group">Reference</div>
+      <a href="#p-limits">Rate Limits &amp; Retries</a>
       <a href="#p-errors">Error Reference</a>
     </div>
 
@@ -1289,6 +1290,82 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">7</span><span class="field-type">note</span><span class="field-desc">Use <code>score</code>, never <code>risk_level</code>, in logic &mdash; there is no <em>MEDIUM</em> label, so 41&ndash;50 reads <code>LOW RISK</code>.</span></div>
       </div>
 
+    </section>
+
+    <hr class="divider" />
+
+    <section id="p-limits">
+      <h2>Rate Limits &amp; Retries</h2>
+      <p>Applies to every <code>/api/engine/*</code> endpoint. Limits are enforced per API key and,
+         independently, across all keys.</p>
+
+      <h3>Limits</h3>
+      <table class="params-table">
+        <thead><tr><th>Window</th><th>Per key</th><th>All keys combined</th></tr></thead>
+        <tbody>
+          <tr><td>per second</td><td><span class="param-type">5</span></td><td><span class="param-type">10</span></td></tr>
+          <tr><td>per minute</td><td><span class="param-type">50</span></td><td><span class="param-type">200</span></td></tr>
+          <tr><td>per day</td><td><span class="param-type">1 000</span></td><td><span class="param-type">10 000</span></td></tr>
+        </tbody>
+      </table>
+      <p>The three windows apply together: a burst of 5 in one second is accepted, and a sixth in the
+         same second is not, even with the daily allowance untouched. Because the combined limit is
+         shared, a key can receive <code>429</code> without having exceeded its own quota. Higher
+         limits can be set per key on request.</p>
+
+      <h3>Which responses consume quota</h3>
+      <p>Checks run in this order: <strong>authentication &rarr; rate limit &rarr; input validation
+         &rarr; scoring</strong>. Anything rejected before the rate-limit step costs nothing.</p>
+      <table class="params-table">
+        <thead><tr><th>Response</th><th>Consumes quota</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td><span class="status-code s200">200</span></td><td><strong>yes</strong></td><td>A completed request.</td></tr>
+          <tr><td><span class="status-code s400">400</span></td><td><strong>yes</strong></td><td>Validation runs after the rate-limit check, so a malformed address still costs one request. Validate client-side where you can.</td></tr>
+          <tr><td><span class="status-code s502">503</span></td><td><strong>yes</strong></td><td>Returned from the same stage as <code>400</code>.</td></tr>
+          <tr><td><span class="status-code s401">401</span></td><td>no</td><td>Rejected before the rate limiter.</td></tr>
+          <tr><td><span class="status-code s403">403</span></td><td>no</td><td>Rejected before the rate limiter.</td></tr>
+          <tr><td><span class="status-code s429">429</span></td><td>no</td><td>A refused request consumes nothing, so a retry starts from the same allowance.</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Retrying</h3>
+      <div class="note"><strong><code>429</code> carries <code>Retry-After</code> in seconds.</strong>
+        The value is the real time until the exhausted window refills, not a fixed constant. Wait at
+        least that long; a retry sooner is refused again and the wait does not grow.</div>
+      <table class="params-table">
+        <thead><tr><th>Response</th><th>Retry</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><span class="status-code s429">429</span></td><td>yes</td><td>Honour <code>Retry-After</code>. Safe to retry indefinitely; it is a throttle, not a failure.</td></tr>
+          <tr><td><span class="status-code s502">503</span></td><td>yes</td><td>Honour <code>Retry-After</code> (also exposed as <code>retry_after_seconds</code>). Risk data is not loaded; the request has not been assessed.</td></tr>
+          <tr><td><span class="status-code s500">500</span></td><td>once</td><td>Retry once after a short pause. If it repeats, quote the <code>request_id</code>.</td></tr>
+          <tr><td><span class="status-code s400">400</span></td><td>no</td><td>Deterministic. The same request will fail identically — fix the input.</td></tr>
+          <tr><td><span class="status-code s401">401</span></td><td>no</td><td>Fix the key or the header.</td></tr>
+          <tr><td><span class="status-code s403">403</span></td><td>no</td><td>The key is not granted this endpoint. Contact us.</td></tr>
+        </tbody>
+      </table>
+      <p>A retry is an independent request: it re-reads current data and returns a fresh
+         <code>report_id</code> if anything affecting the answer has changed, or the same one if
+         nothing has. Retries are not deduplicated, so each one that reaches the scoring stage counts
+         against the quota.</p>
+
+      <h3>Usage Records</h3>
+      <p>Every request that reaches the rate-limit stage is recorded with its <code>request_id</code>,
+         endpoint, response status and execution time. That log is the record of usage, and it counts
+         retries individually &mdash; nothing is deduplicated. Commercial terms are set by agreement
+         and are not expressed in the API.</p>
+
+      <h3>Diagnostics</h3>
+      <p>Every error body carries a <code>request_id</code>. Quote it when reporting a problem &mdash;
+         it identifies the exact request in our logs.</p>
+      <div class="curl-wrap">
+        <pre>{ <span class="json-key">"error"</span>: <span class="json-str">"Too Many Requests"</span>, <span class="json-key">"message"</span>: <span class="json-str">"Per-user rate limit exceeded"</span>, <span class="json-key">"request_id"</span>: <span class="json-str">"27905ac8-79f1-4e88-bc5d-d87c4ff88ed7"</span> }</pre>
+        <span class="copy-btn">COPY</span>
+      </div>
+
+      <h3>Concurrency</h3>
+      <p>Parallel requests are independent and never interleave: each response corresponds only to its
+         own <code>address</code>, which is echoed in <code>wallet.address</code>. Keep concurrency at
+         or below the per-second limit; beyond that the surplus is refused rather than queued.</p>
     </section>
 
     <hr class="divider" />
