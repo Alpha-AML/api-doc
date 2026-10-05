@@ -474,7 +474,6 @@
       <a href="#p-upstream-categories">&nbsp;&nbsp;Category Dictionary</a>
       <div class="nav-group">Reference</div>
       <a href="#p-errors">Error Reference</a>
-      <a href="#p-example-response">Example Response</a>
     </div>
 
     <!-- risk grade nav -->
@@ -781,7 +780,7 @@ curl -H "X-apikey: &lt;key&gt;" \
       </div>
 
       <h3 id="p-upstream-example">Full Response Example (200 OK)</h3>
-      <p>A real response, with long arrays trimmed. Every key the endpoint can return is present.</p>
+      <p>Long arrays are trimmed for readability. Every key the endpoint can return is shown.</p>
       <div class="curl-wrap">
         <pre>{
   <span class="json-key">"report"</span>: {
@@ -1212,7 +1211,7 @@ curl -H "X-apikey: &lt;key&gt;" \
          new ones may appear, existing ones are never renamed or redefined. Treat an unrecognised
          code as <code>entity_class: endpoint</code> with the severity reported alongside it.</p>
 
-      <div class="note"><strong>The distinction that matters.</strong> An
+      <div class="note"><strong>Entity classes.</strong> An
         <code>endpoint</code> is itself the risk, and exposure propagates from it. A
         <code>service</code> is a business holding third-party funds &mdash; its payouts are its
         customers' money, so its rating is returned as a <em>counterparty finding</em> and never as a
@@ -1283,20 +1282,13 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="section-box-header">Fail closed</div>
         <div class="field"><span class="field-name">1</span><span class="field-type">hold</span><span class="field-desc">Any response other than <code>200</code>, any body you cannot parse, and any <code>status != "complete"</code>. A missing, <code>null</code> or zero score is never a pass.</span></div>
         <div class="field"><span class="field-name">2</span><span class="field-type">block</span><span class="field-desc"><code>risk_assessment.blacklisted = true</code>, at any score.</span></div>
-        <div class="field"><span class="field-name">3</span><span class="field-type">block</span><span class="field-desc"><code>risk_assessment.score &gt;= 76</code>, the start of the top band. Prefer a band boundary to an arbitrary round number.</span></div>
+        <div class="field"><span class="field-name">3</span><span class="field-type">block</span><span class="field-desc"><code>risk_assessment.score &gt;= 76</code> &mdash; the lower bound of the <code>Very High</code> band.</span></div>
         <div class="field"><span class="field-name">4</span><span class="field-type">block</span><span class="field-desc"><code>wallet.entity_tag = "Smart contract"</code> on a plain transfer. Tokens sent to a token contract are unrecoverable &mdash; a loss case, not a risk case.</span></div>
-        <div class="field"><span class="field-name">5</span><span class="field-type">review</span><span class="field-desc">A <code>funded_by_entity_type_distribution[]</code> entry whose <code>category_code</code> you do not accept, above a share you choose. A rated venue will not on its own push a score into the top band, so threshold on the category if that matters to you.</span></div>
+        <div class="field"><span class="field-name">5</span><span class="field-type">review</span><span class="field-desc">A <code>funded_by_entity_type_distribution[]</code> entry whose <code>category_code</code> you do not accept, above a share you choose. A rated venue contributes to the score without reaching the top band on its own, so threshold on the category where that matters.</span></div>
         <div class="field"><span class="field-name">6</span><span class="field-type">warn</span><span class="field-desc"><code>coverage = "no_history"</code>. Unexamined, not proven clean.</span></div>
         <div class="field"><span class="field-name">7</span><span class="field-type">note</span><span class="field-desc">Use <code>score</code>, never <code>risk_level</code>, in logic &mdash; there is no <em>MEDIUM</em> label, so 41&ndash;50 reads <code>LOW RISK</code>.</span></div>
       </div>
 
-      <h3>Reproducibility &amp; Caching</h3>
-      <p>Two identical calls return a byte-identical payload apart from
-         <code>report.generated_at_utc</code>. <code>report_id</code> is a digest of the address,
-         network, requested block, <code>model_version</code> and the data watermark, so it is safe as
-         a cache key: if it has not changed, neither has the verdict. When it does change, something
-         that affects the answer changed &mdash; new data, a new model version, or a different
-         <code>block</code>.</p>
     </section>
 
     <hr class="divider" />
@@ -1342,33 +1334,7 @@ curl -H "X-apikey: &lt;key&gt;" \
       </div>
     </section>
 
-    <hr class="divider" />
-
-    <section id="p-example-response">
-      <h2>Example Upstream Response</h2>
-      <pre>{
-  <span class="json-key">"report"</span>: { <span class="json-key">"generated_at_utc"</span>: <span class="json-str">"2026-05-25T18:13:44Z"</span> },
-  <span class="json-key">"wallet"</span>: {
-    <span class="json-key">"address"</span>: <span class="json-str">"0x7f367cc41522ce07553e823bf3be79a889debe1b"</span>,
-    <span class="json-key">"blockchain"</span>: <span class="json-str">"ETHEREUM"</span>,
-    <span class="json-key">"description"</span>: <span class="json-str">"Wu Huihui (DPRK OTC - ETH)"</span>,
-    <span class="json-key">"entity_tag"</span>: <span class="json-str">"Mixer addresses"</span>
-  },
-  <span class="json-key">"risk_assessment"</span>: {
-    <span class="json-key">"score"</span>: <span class="json-num">85</span>,
-    <span class="json-key">"score_max"</span>: <span class="json-num">100</span>,
-    <span class="json-key">"risk_level"</span>: <span class="json-str">"VERY HIGH RISK"</span>,
-    <span class="json-key">"blacklisted"</span>: <span class="json-bool">true</span>,
-    <span class="json-key">"blacklist_note"</span>: <span class="json-str">"Direct blacklist match found"</span>
-  },
-  <span class="json-key">"wallet_statistics"</span>: {
-    <span class="json-key">"total_transactions_count"</span>: <span class="json-num">8</span>,
-    <span class="json-key">"wallet_age_days"</span>: <span class="json-num">1858</span>,
-    <span class="json-key">"status"</span>: <span class="json-str">"INACTIVE"</span>
-  }
-}</pre>
-    </section>
-
+    
   </div>
 
   <!-- ════ RISK GRADE ════ -->
