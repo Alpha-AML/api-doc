@@ -469,6 +469,10 @@
       <a href="#p-service">GET /api/report/wallet</a>
       <a href="#p-service-tx">GET /api/report/txhash</a>
       <a href="#p-upstream">GET /api/engine/report-v1</a>
+      <a href="#p-upstream-example">&nbsp;&nbsp;Response Example</a>
+      <a href="#p-upstream-fields">&nbsp;&nbsp;Response Fields</a>
+      <a href="#p-upstream-categories">&nbsp;&nbsp;Category Dictionary</a>
+      <a href="#p-upstream-breaking">&nbsp;&nbsp;Breaking Changes</a>
       <div class="nav-group">Reference</div>
       <a href="#p-errors">Error Reference</a>
       <a href="#p-example-response">Example Response</a>
@@ -717,17 +721,28 @@ curl -H "X-apikey: &lt;key&gt;" \
 
     <section id="p-upstream">
       <h2>GET /api/engine/report-v1</h2>
-      <p>Called internally via <code>DataApiService</code> (Retrofit). <strong>Not</strong> exposed to external clients — our service proxies and converts the JSON to PDF.</p>
+      <p>Address risk report. This is the agreed integration endpoint and <strong>is</strong>
+         available to external clients with a valid key &mdash; earlier revisions of this page
+         described it as internal, which was incorrect.</p>
       <div class="endpoint-bar">
         <span class="method get">GET</span>
         <span class="ep-path">https://api.alpha-aml.com/api/engine/report-v1?address={address}&amp;chain={chain}</span>
       </div>
 
+      <div class="note"><strong>Model version 4.1.0.</strong> Every field below is returned by the
+        deployed build. All additions are backwards compatible; the two behaviour changes that
+        require client action are listed under <a href="#p-upstream-breaking">Breaking changes</a>.</div>
+
       <h3>Headers</h3>
       <table class="params-table">
         <thead><tr><th>Header</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><span class="param-name">X-apikey</span><span class="badge badge-required">required</span></td><td>Long-lived API key injected server-side. Never supplied by callers of our endpoint. <strong>Not</strong> a query parameter — <code>?apiKey=</code> no longer works.</td></tr>
+          <tr><td><span class="param-name">X-apikey</span><span class="badge badge-required">required</span></td>
+              <td>API key. <strong>Header only</strong> &mdash; a key supplied as <code>?apiKey=</code>
+                  returns <code>401</code>.</td></tr>
+          <tr><td><span class="param-name">User-Agent</span><span class="badge badge-optional">optional</span></td>
+              <td>Send an identifying value such as <code>your-app/1.0</code>. Some default library
+                  agents are filtered at the edge.</td></tr>
         </tbody>
       </table>
 
@@ -735,33 +750,539 @@ curl -H "X-apikey: &lt;key&gt;" \
       <table class="params-table">
         <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><span class="param-name">address</span><span class="badge badge-required">required</span></td><td><span class="param-type">string</span></td><td>Forwarded from our endpoint.</td></tr>
-          <tr><td><span class="param-name">chain</span><span class="badge badge-optional">optional</span></td><td><span class="param-type">string</span></td><td>Forwarded from our endpoint.</td></tr>
+          <tr><td><span class="param-name">address</span><span class="badge badge-required">required</span></td>
+              <td><span class="param-type">string</span></td>
+              <td>Address to score. Validated for the requested network before any scoring runs; a
+                  malformed address is rejected rather than scored.</td></tr>
+          <tr><td><span class="param-name">chain</span><span class="badge badge-optional">optional</span></td>
+              <td><span class="param-type">string</span></td>
+              <td>Accepts <code>ethereum</code> / <code>ETH</code> / <code>eth</code> and
+                  <code>tron</code> / <code>TRON</code>. Defaults to <code>ethereum</code> when omitted.
+                  Never substituted when supplied: a Tron address sent with <code>chain=ethereum</code>
+                  returns <code>INVALID_ADDRESS</code>.</td></tr>
+          <tr><td><span class="param-name">block</span><span class="badge badge-optional">optional</span></td>
+              <td><span class="param-type">integer</span></td>
+              <td>Point-in-time evaluation. Scores the address using only events at or before this
+                  block, and echoes it back as <code>report.as_of_block</code>. Omit for current state.</td></tr>
         </tbody>
       </table>
 
+      <h3>Supported Networks</h3>
+      <div class="chain-list">
+        <span class="chain-pill">ethereum</span>
+        <span class="chain-pill">tron</span>
+      </div>
+
       <h3>curl Example</h3>
       <div class="curl-wrap">
-        <pre>curl -H "X-apikey: &lt;key&gt;" \
-  "https://api.alpha-aml.com/api/engine/report-v1?address=0x7f367cc41522ce07553e823bf3be79a889debe1b&chain=ETH"</pre>
+        <pre>curl -H "X-apikey: &lt;key&gt;" -A "your-app/1.0" \
+  "https://api.alpha-aml.com/api/engine/report-v1?address=0x08723392ed15743cc38513c4925f5e6be5c17243&amp;chain=ethereum"</pre>
         <span class="copy-btn">COPY</span>
       </div>
 
-      <h3>Response Fields (200 OK JSON)</h3>
-      <div class="section-box">
-        <div class="section-box-header">JSON body consumed by <code>AMLReportGenerator</code></div>
-        <div class="field"><span class="field-name">report.generated_at_utc</span><span class="field-type">string</span><span class="field-desc">Timestamp the upstream report was generated (shown in PDF header).</span></div>
-        <div class="field"><span class="field-name">wallet.address / .blockchain / .description / .entity_tag</span><span class="field-type">string</span><span class="field-desc">Address, chain, entity description, and tag shown in the report header.</span></div>
-        <div class="field"><span class="field-name">risk_assessment.score / .score_max</span><span class="field-type">number</span><span class="field-desc">Numeric risk score and its scale (e.g. 85 / 100).</span></div>
-        <div class="field"><span class="field-name">risk_assessment.risk_level</span><span class="field-type">string</span><span class="field-desc">Tier label: <code>VERY LOW RISK</code> / <code>LOW RISK</code> / <code>HIGH RISK</code> / <code>VERY HIGH RISK</code>.</span></div>
-        <div class="field"><span class="field-name">risk_assessment.blacklisted / .blacklist_note</span><span class="field-type">boolean / string</span><span class="field-desc">Blacklist flag and human-readable note.</span></div>
-        <div class="field"><span class="field-name">risk_assessment.score_zones[]</span><span class="field-type">array</span><span class="field-desc"><code>{ label, range_min, range_max }</code> — drives the gauge legend zones.</span></div>
-        <div class="field"><span class="field-name">token_balances[]</span><span class="field-type">array</span><span class="field-desc">Token balance table (ERC-20 / TRC-20).</span></div>
-        <div class="field"><span class="field-name">wallet_statistics.*</span><span class="field-type">object</span><span class="field-desc">Tx counts, first/last tx timestamps, <code>wallet_age_days</code>, <code>status</code>, stablecoin inflow/outflow/turnover.</span></div>
-        <div class="field"><span class="field-name">funded_by_entity_type_distribution[]</span><span class="field-type">array</span><span class="field-desc"><code>{ label, percentage }</code> — entity-type funding breakdown.</span></div>
-        <div class="field"><span class="field-name">risk_factors.blacklists.status</span><span class="field-type">string</span><span class="field-desc"><code>blacklisted</code> → LISTED, <code>reported</code> → FLAGGED, else CLEAR.</span></div>
-        <div class="field"><span class="field-name">risk_factors.reported_connected_addresses[]</span><span class="field-type">array</span><span class="field-desc">Connected addresses with hop counts and blacklist status.</span></div>
+      <h3 id="p-upstream-example">Full Response Example (200 OK)</h3>
+      <p>A real response, with long arrays trimmed. Every key the endpoint can return is present.</p>
+      <div class="curl-wrap">
+        <pre>{
+  <span class="json-key">"report"</span>: {
+    <span class="json-key">"report_id"</span>: <span class="json-str">&quot;rpt_8cb72fed8c703857387084d3ba58aa05&quot;</span>,
+    <span class="json-key">"status"</span>: <span class="json-str">&quot;complete&quot;</span>,
+    <span class="json-key">"coverage"</span>: <span class="json-str">&quot;full&quot;</span>,
+    <span class="json-key">"is_final"</span>: <span class="json-bool">true</span>,
+    <span class="json-key">"preliminary"</span>: <span class="json-bool">false</span>,
+    <span class="json-key">"model_version"</span>: <span class="json-str">&quot;4.1.0-da50fad0&quot;</span>,
+    <span class="json-key">"generated_at_utc"</span>: <span class="json-str">&quot;2026-10-05T22:11:43Z&quot;</span>,
+    <span class="json-key">"data_as_of"</span>: {
+      <span class="json-key">"chain_head_block"</span>: <span class="json-num">26129074</span>,
+      <span class="json-key">"graph_block"</span>: <span class="json-num">26123502</span>,
+      <span class="json-key">"graph_lag_blocks"</span>: <span class="json-num">5572</span>,
+      <span class="json-key">"note"</span>: <span class="json-str">&quot;Activity is current to the chain head; exposure is current to graph_block.&quot;</span>
+    }
+  },
+  <span class="json-key">"wallet"</span>: {
+    <span class="json-key">"address"</span>: <span class="json-str">&quot;0x08723392ed15743cc38513c4925f5e6be5c17243&quot;</span>,
+    <span class="json-key">"blockchain"</span>: <span class="json-str">&quot;ETHEREUM&quot;</span>,
+    <span class="json-key">"description"</span>: <span class="json-str">&quot;Lazarus Group Ronin Hack ETH (OFAC SDN - May 6 #2)&quot;</span>,
+    <span class="json-key">"entity_tag"</span>: <span class="json-str">&quot;Lazarus Group&quot;</span>
+  },
+  <span class="json-key">"risk_assessment"</span>: {
+    <span class="json-key">"score"</span>: <span class="json-num">100.0</span>,
+    <span class="json-key">"score_max"</span>: <span class="json-num">100</span>,
+    <span class="json-key">"risk_level"</span>: <span class="json-str">&quot;VERY HIGH RISK&quot;</span>,
+    <span class="json-key">"blacklisted"</span>: <span class="json-bool">true</span>,
+    <span class="json-key">"blacklist_note"</span>: <span class="json-str">&quot;Address found in 6 reference list(s)&quot;</span>,
+    <span class="json-key">"risk_sources_count"</span>: <span class="json-num">11</span>,
+    <span class="json-key">"risk_sources_note"</span>: <span class="json-str">&quot;flagged connected addresses&quot;</span>,
+    <span class="json-key">"score_zones"</span>: [
+      {
+        <span class="json-key">"label"</span>: <span class="json-str">&quot;Very Low&quot;</span>,
+        <span class="json-key">"range_min"</span>: <span class="json-num">0</span>,
+        <span class="json-key">"range_max"</span>: <span class="json-num">25</span>
+      },
+      {
+        <span class="json-key">"label"</span>: <span class="json-str">&quot;Low&quot;</span>,
+        <span class="json-key">"range_min"</span>: <span class="json-num">26</span>,
+        <span class="json-key">"range_max"</span>: <span class="json-num">40</span>
+      }
+    ]
+  },
+  <span class="json-key">"token_balances"</span>: [
+    {
+      <span class="json-key">"token"</span>: <span class="json-str">&quot;ETH&quot;</span>,
+      <span class="json-key">"contract_address"</span>: <span class="json-str">&quot;&quot;</span>,
+      <span class="json-key">"balance"</span>: <span class="json-num">3.2972312</span>
+    }
+  ],
+  <span class="json-key">"wallet_statistics"</span>: {
+    <span class="json-key">"received_transactions_count"</span>: <span class="json-num">13</span>,
+    <span class="json-key">"sent_transactions_count"</span>: <span class="json-num">4</span>,
+    <span class="json-key">"total_transactions_count"</span>: <span class="json-num">17</span>,
+    <span class="json-key">"first_transaction_utc"</span>: <span class="json-str">&quot;2022-05-04T07:32:25Z&quot;</span>,
+    <span class="json-key">"last_transaction_utc"</span>: <span class="json-str">&quot;2026-08-10T05:51:59Z&quot;</span>,
+    <span class="json-key">"wallet_age_days"</span>: <span class="json-num">1615</span>,
+    <span class="json-key">"status"</span>: <span class="json-str">&quot;ACTIVE&quot;</span>,
+    <span class="json-key">"stablecoin_inflow_usd"</span>: <span class="json-num">0.0</span>,
+    <span class="json-key">"stablecoin_outflow_usd"</span>: <span class="json-num">0.0</span>,
+    <span class="json-key">"stablecoin_turnover_usd"</span>: <span class="json-num">0.0</span>
+  },
+  <span class="json-key">"funded_by_entity_type_distribution"</span>: [
+    {
+      <span class="json-key">"label"</span>: <span class="json-str">&quot;Smart contract&quot;</span>,
+      <span class="json-key">"percentage"</span>: <span class="json-num">66.7</span>,
+      <span class="json-key">"category_code"</span>: <span class="json-str">&quot;unknown&quot;</span>,
+      <span class="json-key">"category_label"</span>: <span class="json-str">&quot;Unknown attribution&quot;</span>,
+      <span class="json-key">"entity_class"</span>: <span class="json-str">&quot;&quot;</span>,
+      <span class="json-key">"risk_bearing"</span>: <span class="json-bool">false</span>,
+      <span class="json-key">"source"</span>: <span class="json-str">&quot;&quot;</span>,
+      <span class="json-key">"transfer_count"</span>: <span class="json-num">2</span>,
+      <span class="json-key">"denominator"</span>: <span class="json-str">&quot;incoming_transfer_count&quot;</span>
+    },
+    {
+      <span class="json-key">"label"</span>: <span class="json-str">&quot;Unnamed active wallet&quot;</span>,
+      <span class="json-key">"percentage"</span>: <span class="json-num">33.3</span>,
+      <span class="json-key">"category_code"</span>: <span class="json-str">&quot;unknown&quot;</span>,
+      <span class="json-key">"category_label"</span>: <span class="json-str">&quot;Unknown attribution&quot;</span>,
+      <span class="json-key">"entity_class"</span>: <span class="json-str">&quot;&quot;</span>,
+      <span class="json-key">"risk_bearing"</span>: <span class="json-bool">false</span>,
+      <span class="json-key">"source"</span>: <span class="json-str">&quot;&quot;</span>,
+      <span class="json-key">"transfer_count"</span>: <span class="json-num">1</span>,
+      <span class="json-key">"denominator"</span>: <span class="json-str">&quot;incoming_transfer_count&quot;</span>
+    }
+  ],
+  <span class="json-key">"risk_factors"</span>: {
+    <span class="json-key">"blacklists"</span>: {
+      <span class="json-key">"status"</span>: <span class="json-str">&quot;Flagged&quot;</span>,
+      <span class="json-key">"score"</span>: <span class="json-num">100</span>,
+      <span class="json-key">"detail"</span>: <span class="json-str">&quot;Address found in 6 reference list(s)&quot;</span>
+    },
+    <span class="json-key">"reported_connected_addresses"</span>: [
+      {
+        <span class="json-key">"severity"</span>: <span class="json-str">&quot;Severe&quot;</span>,
+        <span class="json-key">"score"</span>: <span class="json-num">100</span>,
+        <span class="json-key">"address_count"</span>: <span class="json-num">3</span>,
+        <span class="json-key">"status"</span>: <span class="json-str">&quot;Reported&quot;</span>,
+        <span class="json-key">"addresses"</span>: [
+          {
+            <span class="json-key">"address"</span>: <span class="json-str">&quot;0x08723392ed15743cc38513c4925f5e6be5c17243&quot;</span>,
+            <span class="json-key">"hops"</span>: <span class="json-num">0</span>
+          },
+          {
+            <span class="json-key">"address"</span>: <span class="json-str">&quot;0x098b716b8aaf21512996dc57eb0615e2383e2f96&quot;</span>,
+            <span class="json-key">"hops"</span>: <span class="json-num">1</span>
+          }
+        ]
+      }
+    ],
+    <span class="json-key">"factors"</span>: [
+      {
+        <span class="json-key">"kind"</span>: <span class="json-str">&quot;indirect_exposure&quot;</span>,
+        <span class="json-key">"category_code"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
+        <span class="json-key">"category_label"</span>: <span class="json-str">&quot;Sanctions designation&quot;</span>,
+        <span class="json-key">"entity_class"</span>: <span class="json-str">&quot;endpoint&quot;</span>,
+        <span class="json-key">"list_type"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
+        <span class="json-key">"source"</span>: <span class="json-str">&quot;OFAC&quot;</span>,
+        <span class="json-key">"entity"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"jurisdiction"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"severity"</span>: <span class="json-num">100</span>,
+        <span class="json-key">"directness"</span>: <span class="json-str">&quot;indirect&quot;</span>,
+        <span class="json-key">"hops"</span>: <span class="json-num">1</span>,
+        <span class="json-key">"share_pct"</span>: <span class="json-num">100.0</span>,
+        <span class="json-key">"amount_usd"</span>: <span class="json-num">0.0</span>,
+        <span class="json-key">"denominator"</span>: <span class="json-str">&quot;total_priced_inflow_usd&quot;</span>,
+        <span class="json-key">"contribution_points"</span>: <span class="json-num">120.0</span>,
+        <span class="json-key">"detail"</span>: <span class="json-str">&quot;100.0% of received value traces to 11 sanctions source(s), nearest 1 hop(s) away&quot;</span>
+      },
+      {
+        <span class="json-key">"kind"</span>: <span class="json-str">&quot;blacklist&quot;</span>,
+        <span class="json-key">"category_code"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
+        <span class="json-key">"category_label"</span>: <span class="json-str">&quot;Sanctions designation&quot;</span>,
+        <span class="json-key">"entity_class"</span>: <span class="json-str">&quot;endpoint&quot;</span>,
+        <span class="json-key">"list_type"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
+        <span class="json-key">"source"</span>: <span class="json-str">&quot;OFAC&quot;</span>,
+        <span class="json-key">"entity"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"jurisdiction"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"severity"</span>: <span class="json-num">100</span>,
+        <span class="json-key">"directness"</span>: <span class="json-str">&quot;direct&quot;</span>,
+        <span class="json-key">"hops"</span>: <span class="json-num">0</span>,
+        <span class="json-key">"share_pct"</span>: <span class="json-num">100.0</span>,
+        <span class="json-key">"amount_usd"</span>: <span class="json-num">0.0</span>,
+        <span class="json-key">"denominator"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"contribution_points"</span>: <span class="json-num">100.0</span>,
+        <span class="json-key">"detail"</span>: <span class="json-str">&quot;Address is named directly in OFAC (sanctions)&quot;</span>
+      }
+    ],
+    <span class="json-key">"score_breakdown"</span>: {
+      <span class="json-key">"direct_listing"</span>: <span class="json-num">100.0</span>,
+      <span class="json-key">"counterparty"</span>: <span class="json-num">100.0</span>,
+      <span class="json-key">"indirect_exposure"</span>: <span class="json-num">100.0</span>,
+      <span class="json-key">"concentration"</span>: <span class="json-num">20.0</span>,
+      <span class="json-key">"activity_baseline"</span>: <span class="json-num">16.88</span>,
+      <span class="json-key">"entity_penalty"</span>: <span class="json-num">75</span>,
+      <span class="json-key">"geo_penalty"</span>: <span class="json-num">19</span>,
+      <span class="json-key">"recognised_entity_credit_applied"</span>: <span class="json-bool">true</span>,
+      <span class="json-key">"counterparty_is_rated_service"</span>: <span class="json-bool">false</span>,
+      <span class="json-key">"treated_as_service"</span>: <span class="json-bool">true</span>,
+      <span class="json-key">"service_basis"</span>: <span class="json-str">&quot;named service, materially contaminated&quot;</span>,
+      <span class="json-key">"score"</span>: <span class="json-num">100.0</span>,
+      <span class="json-key">"degraded_lookups"</span>: [],
+      <span class="json-key">"note"</span>: <span class="json-str">&quot;Components are not additive; the score is not their sum.&quot;</span>
+    },
+    <span class="json-key">"excluded_below_threshold"</span>: {
+      <span class="json-key">"tainted_usd"</span>: <span class="json-num">0.0</span>,
+      <span class="json-key">"source_count"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"note"</span>: <span class="json-str">&quot;Exposure too small to be material. Reported for completeness.&quot;</span>
+    }
+  },
+  <span class="json-key">"entity_attribution"</span>: {
+    <span class="json-key">"attribution"</span>: <span class="json-str">&quot;resolved&quot;</span>,
+    <span class="json-key">"note"</span>: <span class="json-str">&quot;This address is attributed to the entity below.&quot;</span>,
+    <span class="json-key">"entity"</span>: {
+      <span class="json-key">"kind"</span>: <span class="json-str">&quot;company&quot;</span>,
+      <span class="json-key">"id"</span>: <span class="json-str">&quot;Lazarus Group&quot;</span>,
+      <span class="json-key">"name"</span>: <span class="json-str">&quot;Lazarus Group&quot;</span>,
+      <span class="json-key">"risk_score"</span>: <span class="json-num">75</span>,
+      <span class="json-key">"jurisdictions"</span>: [
+        &quot;North Korea&quot;,
+        &quot;South Korea&quot;,
+        &quot;United States&quot;
+      ],
+      <span class="json-key">"reasons"</span>: [
+        {
+          <span class="json-key">"source"</span>: <span class="json-str">&quot;geo_risk&quot;</span>,
+          <span class="json-key">"weight"</span>: <span class="json-num">75</span>,
+          <span class="json-key">"detail"</span>: <span class="json-str">&quot;jurisdiction North Korea&quot;</span>
+        }
+      ]
+    },
+    <span class="json-key">"address_label"</span>: {
+      <span class="json-key">"label"</span>: <span class="json-str">&quot;Lazarus Group Ronin Hack ETH (OFAC SDN - May 6 #2)&quot;</span>,
+      <span class="json-key">"company"</span>: <span class="json-str">&quot;Lazarus Group&quot;</span>,
+      <span class="json-key">"country"</span>: <span class="json-str">&quot;North Korea, South Korea, United States, Japan, China, Malaysia, Indonesia, India, Bangladesh, Philippines, United Kingdom, Germany, France, Russia, Australia, Kuwait&quot;</span>,
+      <span class="json-key">"recognised_operator"</span>: <span class="json-bool">false</span>,
+      <span class="json-key">"labelled_in_registry"</span>: <span class="json-bool">true</span>,
+      <span class="json-key">"behaves_as_service"</span>: <span class="json-bool">true</span>,
+      <span class="json-key">"service_basis"</span>: <span class="json-str">&quot;named service, materially contaminated&quot;</span>
+    }
+  },
+  <span class="json-key">"jurisdiction_risk"</span>: {
+    <span class="json-key">"jurisdictions"</span>: [
+      {
+        <span class="json-key">"country"</span>: <span class="json-str">&quot;North Korea&quot;</span>,
+        <span class="json-key">"tier"</span>: <span class="json-str">&quot;high_risk&quot;</span>,
+        <span class="json-key">"weight"</span>: <span class="json-num">75</span>
+      },
+      {
+        <span class="json-key">"country"</span>: <span class="json-str">&quot;South Korea&quot;</span>,
+        <span class="json-key">"tier"</span>: <span class="json-str">&quot;not_listed&quot;</span>,
+        <span class="json-key">"weight"</span>: <span class="json-num">0</span>
+      },
+      {
+        <span class="json-key">"country"</span>: <span class="json-str">&quot;United States&quot;</span>,
+        <span class="json-key">"tier"</span>: <span class="json-str">&quot;not_listed&quot;</span>,
+        <span class="json-key">"weight"</span>: <span class="json-num">0</span>
+      }
+    ],
+    <span class="json-key">"listed_count"</span>: <span class="json-num">1</span>,
+    <span class="json-key">"total_linked_count"</span>: <span class="json-num">16</span>,
+    <span class="json-key">"truncated"</span>: <span class="json-str">&quot;showing 8 of 16, highest-weighted first&quot;</span>,
+    <span class="json-key">"applied_penalty_points"</span>: <span class="json-num">19</span>,
+    <span class="json-key">"basis"</span>: <span class="json-str">&quot;North Korea is a high-risk jurisdiction&quot;</span>,
+    <span class="json-key">"note"</span>: <span class="json-str">&quot;Jurisdiction is a contributing factor, not a verdict. An empty list means no jurisdiction was found for this address.&quot;</span>
+  },
+  <span class="json-key">"related_entities"</span>: {
+    <span class="json-key">"counterparties"</span>: [
+      {
+        <span class="json-key">"address"</span>: <span class="json-str">&quot;0x098b716b8aaf21512996dc57eb0615e2383e2f96&quot;</span>,
+        <span class="json-key">"direction"</span>: <span class="json-str">&quot;received_from&quot;</span>,
+        <span class="json-key">"name"</span>: <span class="json-str">&quot;Sanctions&quot;</span>,
+        <span class="json-key">"company"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"country"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"category_code"</span>: <span class="json-str">&quot;issuer_freeze&quot;</span>,
+        <span class="json-key">"category_label"</span>: <span class="json-str">&quot;Issuer freeze&quot;</span>,
+        <span class="json-key">"entity_class"</span>: <span class="json-str">&quot;endpoint&quot;</span>,
+        <span class="json-key">"severity"</span>: <span class="json-num">90</span>,
+        <span class="json-key">"recognised"</span>: <span class="json-bool">false</span>,
+        <span class="json-key">"value_usd"</span>: <span class="json-num">37785900.0</span>
+      }
+    ],
+    <span class="json-key">"named_counterparty_count"</span>: <span class="json-num">1</span>,
+    <span class="json-key">"risk_bearing_count"</span>: <span class="json-num">1</span>,
+    <span class="json-key">"recognised_count"</span>: <span class="json-num">1</span>,
+    <span class="json-key">"note"</span>: <span class="json-str">&quot;Named counterparties only; anonymous ones are not listed.&quot;</span>
+  }
+}</pre>
+        <span class="copy-btn">COPY</span>
       </div>
+
+      <h3 id="p-upstream-fields">Response Fields</h3>
+      <div class="section-box">
+        <div class="section-box-header"><code>report</code> &mdash; identity, completeness and data freshness</div>
+        <div class="field"><span class="field-name">report_id</span><span class="field-type">string</span><span class="field-desc">Identifies this result: <code>rpt_</code> + 32 hex. Deterministic &mdash; identical inputs return an identical id, and it changes whenever anything affecting the answer changes (new data, new model version, different <code>block</code>). Re-reading a finished report is therefore distinguishable from a fresh recalculation. Not a random UUID.</span></div>
+        <div class="field"><span class="field-name">status</span><span class="field-type">string</span><span class="field-desc"><code>complete</code> &mdash; analysis ran in full. <code>partial</code> &mdash; a component was unavailable; the score is preliminary. <code>unavailable</code> &mdash; no analysis was performed. <strong>Branch on this before reading <code>score</code>.</strong></span></div>
+        <div class="field"><span class="field-name">reason</span><span class="field-type">string</span><span class="field-desc">Present only when <code>status != complete</code>. Current values: <code>CACHE_WARMING</code>, <code>COUNTERPARTY_LOOKUP_FAILED</code>, <code>ENTITY_GEO_LOOKUP_FAILED</code>, <code>RELATED_ENTITIES_LOOKUP_FAILED</code>, <code>AGGREGATES_NOT_BUILT</code>. Treat unknown values as partial.</span></div>
+        <div class="field"><span class="field-name">coverage</span><span class="field-type">string</span><span class="field-desc"><code>full</code> &mdash; the address has history and it was analysed. <code>no_history</code> &mdash; a valid address with zero transfers; distinct from "could not analyse". <code>partial_history</code> &mdash; history exists but was not fully covered.</span></div>
+        <div class="field"><span class="field-name">is_final</span><span class="field-type">boolean</span><span class="field-desc">True only when <code>status = complete</code>. A final report is reproducible: identical inputs return a byte-identical payload.</span></div>
+        <div class="field"><span class="field-name">preliminary</span><span class="field-type">boolean</span><span class="field-desc">Inverse of <code>is_final</code>. A preliminary score is never presented as final.</span></div>
+        <div class="field"><span class="field-name">model_version</span><span class="field-type">string</span><span class="field-desc">Identifies the scoring model and its configuration, e.g. <code>4.1.0-da50fad0</code>. Two reports carrying the same value were produced by the same model against the same configuration. Changes when either changes.</span></div>
+        <div class="field"><span class="field-name">generated_at_utc</span><span class="field-type">string</span><span class="field-desc">ISO-8601 UTC timestamp of this response.</span></div>
+        <div class="field"><span class="field-name">as_of_block</span><span class="field-type">integer</span><span class="field-desc">Echo of the <code>block</code> parameter. Present only when a point-in-time query was requested.</span></div>
+        <div class="field"><span class="field-name">data_as_of.chain_head_block</span><span class="field-type">integer</span><span class="field-desc">Highest block indexed for this network.</span></div>
+        <div class="field"><span class="field-name">data_as_of.graph_block</span><span class="field-type">integer</span><span class="field-desc">Block up to which the exposure graph is computed.</span></div>
+        <div class="field"><span class="field-name">data_as_of.graph_lag_blocks</span><span class="field-type">integer</span><span class="field-desc">Difference between the two. Wallet activity is current to the chain head; graph exposure is current to <code>graph_block</code>. Index lag is therefore visible and never looks like an absent wallet history.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>wallet</code> &mdash; subject of the report</div>
+        <div class="field"><span class="field-name">address</span><span class="field-type">string</span><span class="field-desc">Echoes the requested address, in the network's native format. Base58 case is preserved for Tron.</span></div>
+        <div class="field"><span class="field-name">blockchain</span><span class="field-type">string</span><span class="field-desc">Uppercase network name, e.g. <code>ETHEREUM</code>, <code>TRON</code>.</span></div>
+        <div class="field"><span class="field-name">description</span><span class="field-type">string</span><span class="field-desc">Known label for the address, where one is held. Empty otherwise.</span></div>
+        <div class="field"><span class="field-name">entity_tag</span><span class="field-type">string</span><span class="field-desc">Set to <code>Smart contract</code> when the address is a contract. Useful for blocking plain transfers to token contracts, which are unrecoverable.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>risk_assessment</code> &mdash; the headline verdict</div>
+        <div class="field"><span class="field-name">score</span><span class="field-type">number | null</span><span class="field-desc">Risk score, <code>0</code>&ndash;<code>score_max</code>. <strong>May be <code>null</code></strong> when <code>status != complete</code>. Never read a missing or zero score as clean.</span></div>
+        <div class="field"><span class="field-name">score_max</span><span class="field-type">integer</span><span class="field-desc">Scale maximum, currently <code>100</code>. Always positive.</span></div>
+        <div class="field"><span class="field-name">risk_level</span><span class="field-type">string</span><span class="field-desc"><code>VERY LOW RISK</code> / <code>LOW RISK</code> / <code>HIGH RISK</code> / <code>VERY HIGH RISK</code>. Note there is no <em>MEDIUM</em> string: scores 41&ndash;50 return <code>LOW RISK</code>. <strong>Threshold on <code>score</code>, not on this label.</strong></span></div>
+        <div class="field"><span class="field-name">blacklisted</span><span class="field-type">boolean</span><span class="field-desc">True only when a reference list names this exact address with sufficient confidence. A real boolean, never a string. Necessary but not sufficient: an address can be unlisted and still score 100 on traced exposure.</span></div>
+        <div class="field"><span class="field-name">blacklist_note</span><span class="field-type">string</span><span class="field-desc">Human-readable basis for the flag.</span></div>
+        <div class="field"><span class="field-name">risk_sources_count</span><span class="field-type">integer</span><span class="field-desc">Number of distinct flagged sources this address is connected to.</span></div>
+        <div class="field"><span class="field-name">risk_sources_note</span><span class="field-type">string</span><span class="field-desc">Describes what the count refers to.</span></div>
+        <div class="field"><span class="field-name">score_zones[]</span><span class="field-type">array</span><span class="field-desc"><code>{ label, range_min, range_max }</code>. Published bands: Very Low 0&ndash;25, Low 26&ndash;40, Medium 41&ndash;50, High 51&ndash;75, Very High 76&ndash;100.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>token_balances[]</code> &mdash; current holdings</div>
+        <div class="field"><span class="field-name">token</span><span class="field-type">string</span><span class="field-desc">Symbol, e.g. <code>ETH</code>, <code>USDT</code>.</span></div>
+        <div class="field"><span class="field-name">contract_address</span><span class="field-type">string</span><span class="field-desc">Token contract. Empty for the native coin.</span></div>
+        <div class="field"><span class="field-name">balance</span><span class="field-type">number</span><span class="field-desc">Current balance in token units.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>wallet_statistics</code> &mdash; activity</div>
+        <div class="field"><span class="field-name">received_transactions_count<br>sent_transactions_count<br>total_transactions_count</span><span class="field-type">integer</span><span class="field-desc"><strong>Transfer events</strong> (native coin + ERC-20 / TRC-10 / TRC-20) where the address is sender or receiver, over all history. <strong>Not</strong> external transaction count and <strong>not</strong> internal calls.</span></div>
+        <div class="field"><span class="field-name">first_transaction_utc<br>last_transaction_utc</span><span class="field-type">string</span><span class="field-desc">First and last activity, ISO-8601 UTC. Empty when the address has no history.</span></div>
+        <div class="field"><span class="field-name">wallet_age_days</span><span class="field-type">integer</span><span class="field-desc">Days since first activity.</span></div>
+        <div class="field"><span class="field-name">status</span><span class="field-type">string</span><span class="field-desc"><code>ACTIVE</code> or <code>INACTIVE</code>. <code>INACTIVE</code> with zero transactions means a new or unused address &mdash; unexamined, not cleared.</span></div>
+        <div class="field"><span class="field-name">stablecoin_inflow_usd<br>stablecoin_outflow_usd<br>stablecoin_turnover_usd</span><span class="field-type">number</span><span class="field-desc">Volume in USD-pegged stablecoins specifically, readable as dollars without holding a price date in mind.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>funded_by_entity_type_distribution[]</code> &mdash; where the money came from</div>
+        <div class="field"><span class="field-name">label</span><span class="field-type">string</span><span class="field-desc">Counterparty name where known, otherwise a structural description such as <code>Unnamed high-volume service</code>.</span></div>
+        <div class="field"><span class="field-name">percentage</span><span class="field-type">number</span><span class="field-desc">Share of the denominator. Share of <strong>value</strong>, not of transfer count, unless <code>denominator</code> says otherwise.</span></div>
+        <div class="field"><span class="field-name">category_code</span><span class="field-type">string</span><span class="field-desc">Taxonomy code &mdash; see the <a href="#p-upstream-categories">category dictionary</a>. <strong>Threshold on this, not on <code>label</code>.</strong></span></div>
+        <div class="field"><span class="field-name">category_label</span><span class="field-type">string</span><span class="field-desc">Display name for the code.</span></div>
+        <div class="field"><span class="field-name">entity_class</span><span class="field-type">string</span><span class="field-desc"><code>endpoint</code> or <code>service</code>. Empty for unattributed funders.</span></div>
+        <div class="field"><span class="field-name">risk_bearing</span><span class="field-type">boolean</span><span class="field-desc">True when this funder carries a risk attribution. False for merely unattributed funders.</span></div>
+        <div class="field"><span class="field-name">source</span><span class="field-type">string</span><span class="field-desc">List or registry that produced the attribution. Empty when unattributed.</span></div>
+        <div class="field"><span class="field-name">transfer_count</span><span class="field-type">integer</span><span class="field-desc">Number of transfers behind this share.</span></div>
+        <div class="field"><span class="field-name">denominator</span><span class="field-type">string</span><span class="field-desc"><code>total_priced_inflow_usd</code>, or <code>incoming_transfer_count</code> when nothing received carries a price. <strong>Read this before comparing shares.</strong></span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>risk_factors.blacklists</code> &mdash; direct listing summary</div>
+        <div class="field"><span class="field-name">status</span><span class="field-type">string</span><span class="field-desc"><code>Flagged</code> or <code>Clear</code>.</span></div>
+        <div class="field"><span class="field-name">score</span><span class="field-type">integer</span><span class="field-desc">Highest severity among direct listings, or 0.</span></div>
+        <div class="field"><span class="field-name">detail</span><span class="field-type">string</span><span class="field-desc">Explanation, including the contract case: a contract belonging to a recognised project is reported as such and not scored as a wallet.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>risk_factors.reported_connected_addresses[]</code> &mdash; flagged counterparties by severity band</div>
+        <div class="field"><span class="field-name">severity</span><span class="field-type">string</span><span class="field-desc">Band: <code>Severe</code> / <code>High</code> / <code>Medium</code> / <code>Low</code>. Describes the connected <em>source</em>, not the address you queried.</span></div>
+        <div class="field"><span class="field-name">score</span><span class="field-type">integer</span><span class="field-desc">Highest numeric severity in the band.</span></div>
+        <div class="field"><span class="field-name">address_count</span><span class="field-type">integer</span><span class="field-desc">Number of addresses in the band.</span></div>
+        <div class="field"><span class="field-name">status</span><span class="field-type">string</span><span class="field-desc">Currently always <code>Reported</code>.</span></div>
+        <div class="field"><span class="field-name">addresses[]</span><span class="field-type">array</span><span class="field-desc"><code>{ address, hops }</code>. <code>hops</code> is the real graph distance with no smoothing; <code>0</code> means the queried address itself.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>risk_factors.factors[]</code> &mdash; one entry per finding <span class="obj-type">the decomposition</span></div>
+        <div class="field"><span class="field-name">kind</span><span class="field-type">string</span><span class="field-desc">Which signal produced it: <code>blacklist</code>, <code>indirect_exposure</code>, <code>direct_counterparty</code>, <code>counterparty_venue</code>, <code>entity_risk</code>, <code>geo_risk</code>, <code>trusted_entity</code>, <code>operator_flagged</code>, <code>contract</code>.</span></div>
+        <div class="field"><span class="field-name">category_code</span><span class="field-type">string</span><span class="field-desc">Stable taxonomy code &mdash; see the <a href="#p-upstream-categories">dictionary</a>.</span></div>
+        <div class="field"><span class="field-name">category_label</span><span class="field-type">string</span><span class="field-desc">Display name for the code.</span></div>
+        <div class="field"><span class="field-name">entity_class</span><span class="field-type">string</span><span class="field-desc"><code>endpoint</code> &mdash; the source is itself the risk. <code>service</code> &mdash; a business holding third-party funds.</span></div>
+        <div class="field"><span class="field-name">list_type</span><span class="field-type">string</span><span class="field-desc">Authority behind the match: <code>sanctions</code>, <code>law_enforcement</code>, <code>hack_attribution</code>, <code>issuer_freeze</code>, <code>community_report</code>, <code>operator_rating</code>, <code>derived</code>. This is what separates a government designation from a user complaint.</span></div>
+        <div class="field"><span class="field-name">source</span><span class="field-type">string</span><span class="field-desc">The list or registry that matched. <code>proportional_graph</code> means the finding comes from traced value rather than a named list.</span></div>
+        <div class="field"><span class="field-name">entity</span><span class="field-type">string</span><span class="field-desc">Designated entity or company, where known.</span></div>
+        <div class="field"><span class="field-name">jurisdiction</span><span class="field-type">string</span><span class="field-desc">Issuing authority for a sanctions match, where held.</span></div>
+        <div class="field"><span class="field-name">severity</span><span class="field-type">integer</span><span class="field-desc">0&ndash;100 severity of the <em>source</em>. Never reduced by distance: a source six hops away carries its full severity.</span></div>
+        <div class="field"><span class="field-name">directness</span><span class="field-type">string</span><span class="field-desc"><code>direct</code> &mdash; this address is named. <code>indirect</code> &mdash; inferred from the graph. The two are never merged.</span></div>
+        <div class="field"><span class="field-name">hops</span><span class="field-type">integer</span><span class="field-desc">Real distance. <code>0</code> = the address itself. <code>-1</code> = a path exists but was not resolved because an intervening service breaks the chain of custody; the severity is still reported.</span></div>
+        <div class="field"><span class="field-name">share_pct</span><span class="field-type">number</span><span class="field-desc">Share of the denominator attributable to this finding.</span></div>
+        <div class="field"><span class="field-name">amount_usd</span><span class="field-type">number</span><span class="field-desc">Absolute value attributable to this finding. Use alongside <code>share_pct</code>: a small share of a large balance is material, a small share of a small one is not.</span></div>
+        <div class="field"><span class="field-name">denominator</span><span class="field-type">string</span><span class="field-desc">What <code>share_pct</code> is a share of &mdash; <code>total_priced_inflow_usd</code> or <code>incoming_transfer_count</code>.</span></div>
+        <div class="field"><span class="field-name">contribution_points</span><span class="field-type">number</span><span class="field-desc">Points this component contributed.</span></div>
+        <div class="field"><span class="field-name">detail</span><span class="field-type">string</span><span class="field-desc">One-sentence summary for a reviewer.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>risk_factors.score_breakdown</code> &mdash; what each component contributed</div>
+        <div class="field"><span class="field-name">direct_listing</span><span class="field-type">number</span><span class="field-desc">Contribution from a listing naming this address.</span></div>
+        <div class="field"><span class="field-name">counterparty</span><span class="field-type">number</span><span class="field-desc">Contribution from who funded it directly.</span></div>
+        <div class="field"><span class="field-name">indirect_exposure</span><span class="field-type">number</span><span class="field-desc">Contribution from value traced through the graph.</span></div>
+        <div class="field"><span class="field-name">concentration</span><span class="field-type">number</span><span class="field-desc">Contribution from how concentrated that exposure is.</span></div>
+        <div class="field"><span class="field-name">activity_baseline</span><span class="field-type">number</span><span class="field-desc">Baseline from activity alone. An address nothing is known against is unexamined, not cleared, so this is never zero for an active address.</span></div>
+        <div class="field"><span class="field-name">entity_penalty</span><span class="field-type">integer</span><span class="field-desc">Added for risk carried by the linked company or person.</span></div>
+        <div class="field"><span class="field-name">geo_penalty</span><span class="field-type">integer</span><span class="field-desc">Added for jurisdiction risk.</span></div>
+        <div class="field"><span class="field-name">recognised_entity_credit_applied</span><span class="field-type">boolean</span><span class="field-desc">True when a recognised-operator credit reduced the score, so a major exchange is not scored as dirty for handling everyone's funds.</span></div>
+        <div class="field"><span class="field-name">counterparty_is_rated_service</span><span class="field-type">boolean</span><span class="field-desc">True when the worst direct funder is a rated business rather than a crime source. In that case the finding is about counterparty selection, not about the funds being criminal.</span></div>
+        <div class="field"><span class="field-name">treated_as_service</span><span class="field-type">boolean</span><span class="field-desc">True when the address itself behaves as a high-throughput service, whose inferred exposure describes its depositors more than itself.</span></div>
+        <div class="field"><span class="field-name">service_basis</span><span class="field-type">string</span><span class="field-desc">Why that determination was made, e.g. <code>named service</code>, <code>high-throughput service</code>, <code>not a service</code>.</span></div>
+        <div class="field"><span class="field-name">score</span><span class="field-type">number</span><span class="field-desc">The final score, repeated for convenience.</span></div>
+        <div class="field"><span class="field-name">degraded_lookups[]</span><span class="field-type">array</span><span class="field-desc">Components that failed. Non-empty implies <code>status: partial</code>. A failed lookup lowers the score mechanically, so it must not be read as a cleaner address.</span></div>
+        <div class="field"><span class="field-name">note</span><span class="field-type">string</span><span class="field-desc"><strong>Components are not additive &mdash; the score is not their sum.</strong></span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>risk_factors.excluded_below_threshold</code> &mdash; exposure found but not scored</div>
+        <div class="field"><span class="field-name">tainted_usd</span><span class="field-type">number</span><span class="field-desc">Traced value that fell below the materiality threshold.</span></div>
+        <div class="field"><span class="field-name">source_count</span><span class="field-type">integer</span><span class="field-desc">How many sources it came from.</span></div>
+        <div class="field"><span class="field-name">note</span><span class="field-type">string</span><span class="field-desc">Excluded never means hidden. Immaterial exposure is reported here so a reviewer can see it and apply their own threshold.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>entity_attribution</code> &mdash; who the address belongs to <span class="obj-type">new in 4.1.0</span></div>
+        <div class="field"><span class="field-name">attribution</span><span class="field-type">string</span><span class="field-desc"><code>resolved</code> or <code>none_held</code>. <strong>Branch on this.</strong> A company or person is held for a small minority of addresses, so <code>none_held</code> is the normal answer &mdash; it means none was found, not that none exists, and never that the address is clean.</span></div>
+        <div class="field"><span class="field-name">note</span><span class="field-type">string</span><span class="field-desc">Plain-language restatement of the above.</span></div>
+        <div class="field"><span class="field-name">entity.kind</span><span class="field-type">string</span><span class="field-desc"><code>company</code> or <code>person</code>. Present only when <code>attribution = resolved</code>.</span></div>
+        <div class="field"><span class="field-name">entity.id / entity.name</span><span class="field-type">string</span><span class="field-desc">Identifier and display name of the organisation or individual.</span></div>
+        <div class="field"><span class="field-name">entity.risk_score</span><span class="field-type">integer</span><span class="field-desc">0&ndash;100 risk held against the entity itself, independent of this address. <code>0</code> when the entity is known but carries no risk.</span></div>
+        <div class="field"><span class="field-name">entity.jurisdictions[]</span><span class="field-type">array</span><span class="field-desc">Countries linked to the entity.</span></div>
+        <div class="field"><span class="field-name">entity.reasons[]</span><span class="field-type">array</span><span class="field-desc"><code>{ source, weight, detail }</code> &mdash; why the entity carries risk.</span></div>
+        <div class="field"><span class="field-name">address_label.label</span><span class="field-type">string</span><span class="field-desc">Label held for this specific address, e.g. a named exchange wallet.</span></div>
+        <div class="field"><span class="field-name">address_label.company</span><span class="field-type">string</span><span class="field-desc">Operator this address is attributed to.</span></div>
+        <div class="field"><span class="field-name">address_label.country</span><span class="field-type">string</span><span class="field-desc">Countries linked to the address, as a single string.</span></div>
+        <div class="field"><span class="field-name">address_label.recognised_operator</span><span class="field-type">boolean</span><span class="field-desc">True when the address is matched to a named, recognised operator. Being labelled is not the same as being reputable &mdash; a mixer pool is labelled too.</span></div>
+        <div class="field"><span class="field-name">address_label.labelled_in_registry</span><span class="field-type">boolean</span><span class="field-desc">True when any label is held for the address, whatever its reputation.</span></div>
+        <div class="field"><span class="field-name">address_label.behaves_as_service</span><span class="field-type">boolean</span><span class="field-desc">True when the address behaves as a high-throughput service.</span></div>
+        <div class="field"><span class="field-name">address_label.service_basis</span><span class="field-type">string</span><span class="field-desc">Why, in words.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>jurisdiction_risk</code> &mdash; linked jurisdictions <span class="obj-type">new in 4.1.0</span></div>
+        <div class="field"><span class="field-name">jurisdictions[].country</span><span class="field-type">string</span><span class="field-desc">Country linked to the address or its owner.</span></div>
+        <div class="field"><span class="field-name">jurisdictions[].tier</span><span class="field-type">string</span><span class="field-desc"><code>high_risk</code>, <code>grey_risk</code>, or <code>not_listed</code>.</span></div>
+        <div class="field"><span class="field-name">jurisdictions[].weight</span><span class="field-type">integer</span><span class="field-desc">Relative weight of the tier. <code>0</code> for <code>not_listed</code>.</span></div>
+        <div class="field"><span class="field-name">listed_count</span><span class="field-type">integer</span><span class="field-desc">How many linked jurisdictions are on either list.</span></div>
+        <div class="field"><span class="field-name">total_linked_count</span><span class="field-type">integer</span><span class="field-desc">Total linked, including unlisted ones.</span></div>
+        <div class="field"><span class="field-name">truncated</span><span class="field-type">string</span><span class="field-desc">Present when the list was shortened. Listed jurisdictions sort first, so the omitted tail is unlisted.</span></div>
+        <div class="field"><span class="field-name">applied_penalty_points</span><span class="field-type">integer</span><span class="field-desc">Points actually added to the score for jurisdiction.</span></div>
+        <div class="field"><span class="field-name">basis</span><span class="field-type">string</span><span class="field-desc">Which jurisdiction drove the penalty.</span></div>
+        <div class="field"><span class="field-name">note</span><span class="field-type">string</span><span class="field-desc">Jurisdiction is a contributing factor, not a verdict. An empty list means none was found.</span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>related_entities</code> &mdash; named counterparties <span class="obj-type">new in 4.1.0</span></div>
+        <div class="field"><span class="field-name">counterparties[].address</span><span class="field-type">string</span><span class="field-desc">The counterparty, in the network's native format.</span></div>
+        <div class="field"><span class="field-name">counterparties[].direction</span><span class="field-type">string</span><span class="field-desc"><code>received_from</code> or <code>sent_to</code>.</span></div>
+        <div class="field"><span class="field-name">counterparties[].name / .company / .country</span><span class="field-type">string</span><span class="field-desc">Identity of the counterparty as held.</span></div>
+        <div class="field"><span class="field-name">counterparties[].category_code / .category_label / .entity_class</span><span class="field-type">string</span><span class="field-desc">Its taxonomy classification.</span></div>
+        <div class="field"><span class="field-name">counterparties[].severity</span><span class="field-type">integer</span><span class="field-desc">0&ndash;100 severity if it carries a risk attribution, else 0.</span></div>
+        <div class="field"><span class="field-name">counterparties[].recognised</span><span class="field-type">boolean</span><span class="field-desc">True when matched to a recognised operator.</span></div>
+        <div class="field"><span class="field-name">counterparties[].value_usd</span><span class="field-type">number</span><span class="field-desc">Total priced value exchanged with this counterparty.</span></div>
+        <div class="field"><span class="field-name">named_counterparty_count</span><span class="field-type">integer</span><span class="field-desc">Number returned.</span></div>
+        <div class="field"><span class="field-name">risk_bearing_count</span><span class="field-type">integer</span><span class="field-desc">How many carry a risk attribution.</span></div>
+        <div class="field"><span class="field-name">recognised_count</span><span class="field-type">integer</span><span class="field-desc">How many are recognised operators.</span></div>
+        <div class="field"><span class="field-name">note</span><span class="field-type">string</span><span class="field-desc">Named counterparties only; anonymous ones are not listed. Complements the funder percentages, which give proportions but not names.</span></div>
+      </div>
+
+      <h3 id="p-upstream-categories">Category Dictionary</h3>
+      <p>Also served live at <code>GET /api/engine/categories</code>. Codes are additive: new ones may
+         appear, existing ones are never renamed or redefined. Treat an unrecognised code as
+         <code>entity_class: endpoint</code> with the severity reported alongside it.</p>
+
+      <div class="note"><strong>The distinction that matters.</strong> An
+        <code>endpoint</code> is itself the risk, and exposure propagates from it. A
+        <code>service</code> is a business holding third-party funds &mdash; its payouts are its
+        customers' money, so its rating is returned as a <em>counterparty finding</em> and never as a
+        claim that the funds are criminal. <code>sanctioned_exchange</code> is the deliberate
+        exception: a designated venue propagates like an endpoint.</div>
+
+      <table class="params-table">
+        <thead><tr><th>Code</th><th>Entity class</th><th>List type</th><th>Propagates</th><th>Can set <code>blacklisted</code></th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td><span class="param-name">sanctions</span></td><td><span class="param-type">endpoint</span></td><td><span class="param-type">sanctions</span></td><td>yes</td><td>yes</td><td>Named in a government sanctions designation.</td></tr>
+          <tr><td><span class="param-name">sanctioned_exchange</span></td><td><span class="param-type">service</span></td><td><span class="param-type">sanctions</span></td><td>yes</td><td>yes</td><td>A trading venue that is itself under a designation. Receiving funds from it is the violation, whoever they belonged to.</td></tr>
+          <tr><td><span class="param-name">hack_attribution</span></td><td><span class="param-type">endpoint</span></td><td><span class="param-type">hack_attribution</span></td><td>yes</td><td>yes</td><td>An investigator attributed a specific theft or exploit to the address.</td></tr>
+          <tr><td><span class="param-name">mixer</span></td><td><span class="param-type">endpoint</span></td><td><span class="param-type">derived</span></td><td>yes</td><td>yes</td><td>A service whose function is to break the link between source and destination.</td></tr>
+          <tr><td><span class="param-name">issuer_freeze</span></td><td><span class="param-type">endpoint</span></td><td><span class="param-type">issuer_freeze</span></td><td>yes</td><td>yes</td><td>A token issuer blocked the address on-chain. Operational action by the issuer, not a finding by an authority.</td></tr>
+          <tr><td><span class="param-name">enforcement_action</span></td><td><span class="param-type">endpoint</span></td><td><span class="param-type">law_enforcement</span></td><td>yes</td><td>yes</td><td>Connected to a published regulator or law-enforcement action &mdash; seizure, arrest, court order &mdash; that is not itself a designation. <strong>Defined but not yet populated;</strong> treat its absence as "not covered".</td></tr>
+          <tr><td><span class="param-name">community_report</span></td><td><span class="param-type">endpoint</span></td><td><span class="param-type">community_report</span></td><td>no</td><td>no</td><td>A user-submitted report. Unverified, so it contributes to the score but never sets <code>blacklisted</code>.</td></tr>
+          <tr><td><span class="param-name">high_risk_exchange</span></td><td><span class="param-type">service</span></td><td><span class="param-type">operator_rating</span></td><td>no</td><td>no</td><td>A real venue rated elevated-risk &mdash; weak KYC, prior enforcement, jurisdiction concern. <strong>Not</strong> a designation.</td></tr>
+          <tr><td><span class="param-name">unlicensed_exchange</span></td><td><span class="param-type">service</span></td><td><span class="param-type">operator_rating</span></td><td>no</td><td>no</td><td>A venue operating without a required licence. A licensing failure, not a designation.</td></tr>
+          <tr><td><span class="param-name">medium_reputation_service</span></td><td><span class="param-type">service</span></td><td><span class="param-type">operator_rating</span></td><td>no</td><td>no</td><td>A payment processor, card issuer or custodian rated elevated-risk.</td></tr>
+          <tr><td><span class="param-name">exchange_deposit</span></td><td><span class="param-type">service</span></td><td><span class="param-type">derived</span></td><td>no</td><td>no</td><td>A per-customer deposit address attributed to an exchange.</td></tr>
+          <tr><td><span class="param-name">trusted_entity</span></td><td><span class="param-type">service</span></td><td><span class="param-type">derived</span></td><td>no</td><td>no</td><td>Matched to a named, recognised operator.</td></tr>
+          <tr><td><span class="param-name">trusted_contract</span></td><td><span class="param-type">service</span></td><td><span class="param-type">derived</span></td><td>no</td><td>no</td><td>A contract belonging to a recognised project. Scored as infrastructure.</td></tr>
+          <tr><td><span class="param-name">public_person</span></td><td><span class="param-type">endpoint</span></td><td><span class="param-type">derived</span></td><td>no</td><td>no</td><td>A publicly identified individual.</td></tr>
+          <tr><td><span class="param-name">unknown</span></td><td><span class="param-type">endpoint</span></td><td><span class="param-type">derived</span></td><td>no</td><td>no</td><td>No attribution found. <strong>Unknown, not safe.</strong></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Status &amp; Coverage Vocabulary</h3>
+      <table class="params-table">
+        <thead><tr><th>Field</th><th>Value</th><th>Meaning for an integrator</th></tr></thead>
+        <tbody>
+          <tr><td><span class="param-name">status</span></td><td><code>complete</code></td><td>Analysis ran in full. <code>score</code> is final and the report is reproducible.</td></tr>
+          <tr><td></td><td><code>partial</code></td><td>A component was unavailable. <code>score</code> is preliminary and may be understated. Treat as a hold, not a pass.</td></tr>
+          <tr><td></td><td><code>unavailable</code></td><td>No analysis performed. <code>score</code> is <code>null</code>. Never read as clean.</td></tr>
+          <tr><td><span class="param-name">coverage</span></td><td><code>full</code></td><td>The address has history and it was analysed.</td></tr>
+          <tr><td></td><td><code>no_history</code></td><td>Valid address, zero transfers. A new or unused address &mdash; unexamined, not cleared.</td></tr>
+          <tr><td></td><td><code>partial_history</code></td><td>History exists but was not fully covered.</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="p-upstream-breaking">Breaking Changes in 4.1.0</h3>
+      <div class="note"><strong>1. Warm-up returns 503, not 200.</strong> For roughly 85 seconds after a
+        restart the service previously answered <code>HTTP 200</code> with <code>score: 0</code> and
+        <code>blacklisted: false</code> &mdash; indistinguishable from a clean wallet. It now returns
+        <code>503</code> with <code>Retry-After: 30</code> and
+        <code>{"status":"unavailable","reason":"CACHE_WARMING","score":null}</code>. A client treating
+        <code>200</code> as "analysed" was previously receiving a clean report during every restart.
+        Handle <code>503</code> as a retry, never as a pass.</div>
+      <div class="note"><strong>2. <code>score</code> may be <code>null</code></strong> &mdash; only when
+        <code>status != complete</code>. Clients parsing it as a primitive number must handle null.</div>
+
+      <h3>Recommended Integration Policy</h3>
+      <div class="section-box">
+        <div class="section-box-header">Fail closed</div>
+        <div class="field"><span class="field-name">1</span><span class="field-type">hold</span><span class="field-desc">Any response other than <code>200</code>, any body you cannot parse, and any <code>status != "complete"</code>.</span></div>
+        <div class="field"><span class="field-name">2</span><span class="field-type">block</span><span class="field-desc"><code>risk_assessment.blacklisted = true</code>, at any score.</span></div>
+        <div class="field"><span class="field-name">3</span><span class="field-type">block</span><span class="field-desc"><code>risk_assessment.score &gt;= 76</code>, the start of the top band. Prefer a band boundary to an arbitrary round number.</span></div>
+        <div class="field"><span class="field-name">4</span><span class="field-type">block</span><span class="field-desc"><code>wallet.entity_tag = "Smart contract"</code> on a plain transfer. Tokens sent to a token contract are unrecoverable &mdash; a loss case, not a risk case.</span></div>
+        <div class="field"><span class="field-name">5</span><span class="field-type">review</span><span class="field-desc">A <code>funded_by_entity_type_distribution[]</code> entry whose <code>category_code</code> you do not accept, above a share you choose. A rated venue will not on its own push a score into the top band, so threshold on the category if that matters to you.</span></div>
+        <div class="field"><span class="field-name">6</span><span class="field-type">warn</span><span class="field-desc"><code>coverage = "no_history"</code>. Unexamined, not proven clean.</span></div>
+        <div class="field"><span class="field-name">7</span><span class="field-type">note</span><span class="field-desc">Use <code>score</code>, never <code>risk_level</code>, in logic &mdash; there is no <em>MEDIUM</em> label, so 41&ndash;50 reads <code>LOW RISK</code>.</span></div>
+      </div>
+
+      <h3>Reproducibility &amp; Caching</h3>
+      <p>Two identical calls return a byte-identical payload apart from
+         <code>report.generated_at_utc</code>. <code>report_id</code> is a digest of the address,
+         network, requested block, <code>model_version</code> and the data watermark, so it is safe as
+         a cache key: if it has not changed, neither has the verdict. When it does change, something
+         that affects the answer changed &mdash; new data, a new model version, or a different
+         <code>block</code>.</p>
     </section>
 
     <hr class="divider" />
