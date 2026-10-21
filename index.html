@@ -763,7 +763,13 @@ curl -H "X-apikey: &lt;key&gt;" \
           <tr><td><span class="param-name">block</span><span class="badge badge-optional">optional</span></td>
               <td><span class="param-type">integer</span></td>
               <td>Point-in-time evaluation. Scores the address using only events at or before this
-                  block, and echoes it back as <code>report.as_of_block</code>. Omit for current state.</td></tr>
+                  block, and echoes it back as <code>report.as_of_block</code>. Omit for current state.
+                  Statistics, counterparties and related entities are all cut at this block.
+                  Must be positive and at or below the indexed head, otherwise
+                  <code>INVALID_BLOCK</code> / <code>BLOCK_IN_FUTURE</code>. If the exposure graph
+                  has not reached it, the report comes back <code>partial</code> with
+                  <code>GRAPH_BEHIND_REQUESTED_BLOCK</code> &mdash; activity is answerable, exposure
+                  is not.</td></tr>
         </tbody>
       </table>
 
@@ -785,18 +791,22 @@ curl -H "X-apikey: &lt;key&gt;" \
       <div class="curl-wrap">
         <pre>{
   <span class="json-key">"report"</span>: {
-    <span class="json-key">"report_id"</span>: <span class="json-str">&quot;rpt_8cb72fed8c703857387084d3ba58aa05&quot;</span>,
+    <span class="json-key">"report_id"</span>: <span class="json-str">&quot;rpt_eee33b79440cf7f7e1ac2e491e8fd217&quot;</span>,
     <span class="json-key">"status"</span>: <span class="json-str">&quot;complete&quot;</span>,
     <span class="json-key">"coverage"</span>: <span class="json-str">&quot;full&quot;</span>,
     <span class="json-key">"is_final"</span>: <span class="json-bool">true</span>,
     <span class="json-key">"preliminary"</span>: <span class="json-bool">false</span>,
-    <span class="json-key">"model_version"</span>: <span class="json-str">&quot;4.1.0-da50fad0&quot;</span>,
-    <span class="json-key">"generated_at_utc"</span>: <span class="json-str">&quot;2026-10-05T22:11:43Z&quot;</span>,
+    <span class="json-key">"model_version"</span>: <span class="json-str">&quot;4.2.0-da50fad0&quot;</span>,
+    <span class="json-key">"data_version"</span>: <span class="json-str">&quot;3780a61d&quot;</span>,
+    <span class="json-key">"generated_at_utc"</span>: <span class="json-str">&quot;2026-10-21T16:36:25Z&quot;</span>,
     <span class="json-key">"data_as_of"</span>: {
-      <span class="json-key">"chain_head_block"</span>: <span class="json-num">26129074</span>,
-      <span class="json-key">"graph_block"</span>: <span class="json-num">26123502</span>,
-      <span class="json-key">"graph_lag_blocks"</span>: <span class="json-num">5572</span>,
-      <span class="json-key">"note"</span>: <span class="json-str">&quot;Activity is current to the chain head; exposure is current to graph_block.&quot;</span>
+      <span class="json-key">"chain_head_block"</span>: <span class="json-num">26242211</span>,
+      <span class="json-key">"chain_head_utc"</span>: <span class="json-str">&quot;2026-10-21T16:36:11Z&quot;</span>,
+      <span class="json-key">"graph_block"</span>: <span class="json-num">26238303</span>,
+      <span class="json-key">"graph_utc"</span>: <span class="json-str">&quot;2026-10-21T03:32:59Z&quot;</span>,
+      <span class="json-key">"graph_lag_blocks"</span>: <span class="json-num">3908</span>,
+      <span class="json-key">"graph_lag_seconds"</span>: <span class="json-num">46992</span>,
+      <span class="json-key">"note"</span>: <span class="json-str">&quot;Activity is current to chain_head_block; graph exposure is current to graph_block. A transfer newer than graph_block is not yet in the exposure graph.&quot;</span>
     }
   },
   <span class="json-key">"wallet"</span>: {
@@ -817,12 +827,16 @@ curl -H "X-apikey: &lt;key&gt;" \
       {
         <span class="json-key">"label"</span>: <span class="json-str">&quot;Very Low&quot;</span>,
         <span class="json-key">"range_min"</span>: <span class="json-num">0</span>,
-        <span class="json-key">"range_max"</span>: <span class="json-num">25</span>
+        <span class="json-key">"range_max"</span>: <span class="json-num">25</span>,
+        <span class="json-key">"min_inclusive"</span>: <span class="json-num">0.0</span>,
+        <span class="json-key">"max_exclusive"</span>: <span class="json-num">26.0</span>
       },
       {
         <span class="json-key">"label"</span>: <span class="json-str">&quot;Low&quot;</span>,
         <span class="json-key">"range_min"</span>: <span class="json-num">26</span>,
-        <span class="json-key">"range_max"</span>: <span class="json-num">40</span>
+        <span class="json-key">"range_max"</span>: <span class="json-num">40</span>,
+        <span class="json-key">"min_inclusive"</span>: <span class="json-num">26.0</span>,
+        <span class="json-key">"max_exclusive"</span>: <span class="json-num">41.0</span>
       }
     ]
   },
@@ -839,7 +853,7 @@ curl -H "X-apikey: &lt;key&gt;" \
     <span class="json-key">"total_transactions_count"</span>: <span class="json-num">17</span>,
     <span class="json-key">"first_transaction_utc"</span>: <span class="json-str">&quot;2022-05-04T07:32:25Z&quot;</span>,
     <span class="json-key">"last_transaction_utc"</span>: <span class="json-str">&quot;2026-08-10T05:51:59Z&quot;</span>,
-    <span class="json-key">"wallet_age_days"</span>: <span class="json-num">1615</span>,
+    <span class="json-key">"wallet_age_days"</span>: <span class="json-num">1631</span>,
     <span class="json-key">"status"</span>: <span class="json-str">&quot;ACTIVE&quot;</span>,
     <span class="json-key">"stablecoin_inflow_usd"</span>: <span class="json-num">0.0</span>,
     <span class="json-key">"stablecoin_outflow_usd"</span>: <span class="json-num">0.0</span>,
@@ -855,7 +869,10 @@ curl -H "X-apikey: &lt;key&gt;" \
       <span class="json-key">"risk_bearing"</span>: <span class="json-bool">false</span>,
       <span class="json-key">"source"</span>: <span class="json-str">&quot;&quot;</span>,
       <span class="json-key">"transfer_count"</span>: <span class="json-num">2</span>,
-      <span class="json-key">"denominator"</span>: <span class="json-str">&quot;incoming_transfer_count&quot;</span>
+      <span class="json-key">"denominator"</span>: <span class="json-str">&quot;sampled_inflow_transfers&quot;</span>,
+      <span class="json-key">"denominator_value"</span>: <span class="json-num">3.0</span>,
+      <span class="json-key">"value"</span>: <span class="json-num">2.0</span>,
+      <span class="json-key">"share_pct_exact"</span>: <span class="json-num">66.66667</span>
     },
     {
       <span class="json-key">"label"</span>: <span class="json-str">&quot;Unnamed active wallet&quot;</span>,
@@ -866,9 +883,22 @@ curl -H "X-apikey: &lt;key&gt;" \
       <span class="json-key">"risk_bearing"</span>: <span class="json-bool">false</span>,
       <span class="json-key">"source"</span>: <span class="json-str">&quot;&quot;</span>,
       <span class="json-key">"transfer_count"</span>: <span class="json-num">1</span>,
-      <span class="json-key">"denominator"</span>: <span class="json-str">&quot;incoming_transfer_count&quot;</span>
+      <span class="json-key">"denominator"</span>: <span class="json-str">&quot;sampled_inflow_transfers&quot;</span>,
+      <span class="json-key">"denominator_value"</span>: <span class="json-num">3.0</span>,
+      <span class="json-key">"value"</span>: <span class="json-num">1.0</span>,
+      <span class="json-key">"share_pct_exact"</span>: <span class="json-num">33.33333</span>
     }
   ],
+  <span class="json-key">"funding_scope"</span>: {
+    <span class="json-key">"describes"</span>: <span class="json-str">&quot;address_inflows&quot;</span>,
+    <span class="json-key">"per_transfer"</span>: <span class="json-bool">false</span>,
+    <span class="json-key">"max_transfers_sampled"</span>: <span class="json-num">200000</span>,
+    <span class="json-key">"window_seconds"</span>: <span class="json-num">18000000</span>,
+    <span class="json-key">"anchored_to"</span>: <span class="json-str">&quot;address_last_activity&quot;</span>,
+    <span class="json-key">"denominator"</span>: <span class="json-str">&quot;sampled_inflow_transfers&quot;</span>,
+    <span class="json-key">"denominator_value"</span>: <span class="json-num">3.0</span>,
+    <span class="json-key">"note"</span>: <span class="json-str">&quot;Shares describe this address&#x27;s sampled inflows, NOT the funds of any single transfer. A per-transfer origin breakdown is not available from this endpoint.&quot;</span>
+  },
   <span class="json-key">"risk_factors"</span>: {
     <span class="json-key">"blacklists"</span>: {
       <span class="json-key">"status"</span>: <span class="json-str">&quot;Flagged&quot;</span>,
@@ -895,24 +925,6 @@ curl -H "X-apikey: &lt;key&gt;" \
     ],
     <span class="json-key">"factors"</span>: [
       {
-        <span class="json-key">"kind"</span>: <span class="json-str">&quot;indirect_exposure&quot;</span>,
-        <span class="json-key">"category_code"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
-        <span class="json-key">"category_label"</span>: <span class="json-str">&quot;Sanctions designation&quot;</span>,
-        <span class="json-key">"entity_class"</span>: <span class="json-str">&quot;endpoint&quot;</span>,
-        <span class="json-key">"list_type"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
-        <span class="json-key">"source"</span>: <span class="json-str">&quot;OFAC&quot;</span>,
-        <span class="json-key">"entity"</span>: <span class="json-str">&quot;&quot;</span>,
-        <span class="json-key">"jurisdiction"</span>: <span class="json-str">&quot;&quot;</span>,
-        <span class="json-key">"severity"</span>: <span class="json-num">100</span>,
-        <span class="json-key">"directness"</span>: <span class="json-str">&quot;indirect&quot;</span>,
-        <span class="json-key">"hops"</span>: <span class="json-num">1</span>,
-        <span class="json-key">"share_pct"</span>: <span class="json-num">100.0</span>,
-        <span class="json-key">"amount_usd"</span>: <span class="json-num">0.0</span>,
-        <span class="json-key">"denominator"</span>: <span class="json-str">&quot;total_priced_inflow_usd&quot;</span>,
-        <span class="json-key">"contribution_points"</span>: <span class="json-num">120.0</span>,
-        <span class="json-key">"detail"</span>: <span class="json-str">&quot;100.0% of received value traces to 11 sanctions source(s), nearest 1 hop(s) away&quot;</span>
-      },
-      {
         <span class="json-key">"kind"</span>: <span class="json-str">&quot;blacklist&quot;</span>,
         <span class="json-key">"category_code"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
         <span class="json-key">"category_label"</span>: <span class="json-str">&quot;Sanctions designation&quot;</span>,
@@ -925,32 +937,72 @@ curl -H "X-apikey: &lt;key&gt;" \
         <span class="json-key">"directness"</span>: <span class="json-str">&quot;direct&quot;</span>,
         <span class="json-key">"hops"</span>: <span class="json-num">0</span>,
         <span class="json-key">"share_pct"</span>: <span class="json-num">100.0</span>,
-        <span class="json-key">"amount_usd"</span>: <span class="json-num">0.0</span>,
-        <span class="json-key">"denominator"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"amount_usd"</span>: <span class="json-null">null</span>,
+        <span class="json-key">"denominator"</span>: <span class="json-str">&quot;not_applicable&quot;</span>,
+        <span class="json-key">"denominator_value_usd"</span>: <span class="json-null">null</span>,
+        <span class="json-key">"candidate_points"</span>: <span class="json-num">100.0</span>,
+        <span class="json-key">"applied"</span>: <span class="json-bool">true</span>,
+        <span class="json-key">"effective_points"</span>: <span class="json-num">100.0</span>,
+        <span class="json-key">"exclusion_reason"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"source_addresses"</span>: [
+          &quot;0x08723392ed15743cc38513c4925f5e6be5c17243&quot;
+        ],
+        <span class="json-key">"source_count"</span>: <span class="json-num">1</span>,
         <span class="json-key">"contribution_points"</span>: <span class="json-num">100.0</span>,
         <span class="json-key">"detail"</span>: <span class="json-str">&quot;Address is named directly in OFAC (sanctions)&quot;</span>
+      },
+      {
+        <span class="json-key">"kind"</span>: <span class="json-str">&quot;blacklist&quot;</span>,
+        <span class="json-key">"category_code"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
+        <span class="json-key">"category_label"</span>: <span class="json-str">&quot;Sanctions designation&quot;</span>,
+        <span class="json-key">"entity_class"</span>: <span class="json-str">&quot;endpoint&quot;</span>,
+        <span class="json-key">"list_type"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
+        <span class="json-key">"source"</span>: <span class="json-str">&quot;ofac_sanctions_list&quot;</span>,
+        <span class="json-key">"entity"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"jurisdiction"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"severity"</span>: <span class="json-num">100</span>,
+        <span class="json-key">"directness"</span>: <span class="json-str">&quot;direct&quot;</span>,
+        <span class="json-key">"hops"</span>: <span class="json-num">0</span>,
+        <span class="json-key">"share_pct"</span>: <span class="json-num">100.0</span>,
+        <span class="json-key">"amount_usd"</span>: <span class="json-null">null</span>,
+        <span class="json-key">"denominator"</span>: <span class="json-str">&quot;not_applicable&quot;</span>,
+        <span class="json-key">"denominator_value_usd"</span>: <span class="json-null">null</span>,
+        <span class="json-key">"candidate_points"</span>: <span class="json-num">100.0</span>,
+        <span class="json-key">"applied"</span>: <span class="json-bool">true</span>,
+        <span class="json-key">"effective_points"</span>: <span class="json-num">100.0</span>,
+        <span class="json-key">"exclusion_reason"</span>: <span class="json-str">&quot;&quot;</span>,
+        <span class="json-key">"source_addresses"</span>: [
+          &quot;0x08723392ed15743cc38513c4925f5e6be5c17243&quot;
+        ],
+        <span class="json-key">"source_count"</span>: <span class="json-num">1</span>,
+        <span class="json-key">"contribution_points"</span>: <span class="json-num">100.0</span>,
+        <span class="json-key">"detail"</span>: <span class="json-str">&quot;Address is named directly in ofac_sanctions_list (sanctions)&quot;</span>
       }
     ],
     <span class="json-key">"score_breakdown"</span>: {
       <span class="json-key">"direct_listing"</span>: <span class="json-num">100.0</span>,
       <span class="json-key">"counterparty"</span>: <span class="json-num">100.0</span>,
-      <span class="json-key">"indirect_exposure"</span>: <span class="json-num">100.0</span>,
-      <span class="json-key">"concentration"</span>: <span class="json-num">20.0</span>,
+      <span class="json-key">"indirect_exposure"</span>: <span class="json-num">0.75</span>,
+      <span class="json-key">"concentration"</span>: <span class="json-num">0.0</span>,
       <span class="json-key">"activity_baseline"</span>: <span class="json-num">16.88</span>,
       <span class="json-key">"entity_penalty"</span>: <span class="json-num">75</span>,
       <span class="json-key">"geo_penalty"</span>: <span class="json-num">19</span>,
       <span class="json-key">"recognised_entity_credit_applied"</span>: <span class="json-bool">true</span>,
       <span class="json-key">"counterparty_is_rated_service"</span>: <span class="json-bool">false</span>,
       <span class="json-key">"treated_as_service"</span>: <span class="json-bool">true</span>,
-      <span class="json-key">"service_basis"</span>: <span class="json-str">&quot;named service, materially contaminated&quot;</span>,
+      <span class="json-key">"service_basis"</span>: <span class="json-str">&quot;named service&quot;</span>,
       <span class="json-key">"score"</span>: <span class="json-num">100.0</span>,
       <span class="json-key">"degraded_lookups"</span>: [],
-      <span class="json-key">"note"</span>: <span class="json-str">&quot;Components are not additive; the score is not their sum.&quot;</span>
+      <span class="json-key">"decided_by"</span>: <span class="json-str">&quot;direct_listing&quot;</span>,
+      <span class="json-key">"decided_by_category"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
+      <span class="json-key">"decided_by_list_type"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
+      <span class="json-key">"note"</span>: <span class="json-str">&quot;Components are not additive; the score is the strongest of them. decided_by names the one that set it; factors marked applied=false were found and reported but did not change the score.&quot;</span>
     },
     <span class="json-key">"excluded_below_threshold"</span>: {
       <span class="json-key">"tainted_usd"</span>: <span class="json-num">0.0</span>,
       <span class="json-key">"source_count"</span>: <span class="json-num">0</span>,
-      <span class="json-key">"note"</span>: <span class="json-str">&quot;Exposure too small to be material. Reported for completeness.&quot;</span>
+      <span class="json-key">"rule"</span>: <span class="json-str">&quot;absolute_traced_value_usd&quot;</span>,
+      <span class="json-key">"note"</span>: <span class="json-str">&quot;Traced value below the materiality threshold. The test is on the absolute USD figure, not on the share. Such exposure is reported here and still contributes, but on the conservative curve.&quot;</span>
     }
   },
   <span class="json-key">"entity_attribution"</span>: {
@@ -981,7 +1033,7 @@ curl -H "X-apikey: &lt;key&gt;" \
       <span class="json-key">"recognised_operator"</span>: <span class="json-bool">false</span>,
       <span class="json-key">"labelled_in_registry"</span>: <span class="json-bool">true</span>,
       <span class="json-key">"behaves_as_service"</span>: <span class="json-bool">true</span>,
-      <span class="json-key">"service_basis"</span>: <span class="json-str">&quot;named service, materially contaminated&quot;</span>
+      <span class="json-key">"service_basis"</span>: <span class="json-str">&quot;named service&quot;</span>
     }
   },
   <span class="json-key">"jurisdiction_risk"</span>: {
@@ -1036,10 +1088,21 @@ curl -H "X-apikey: &lt;key&gt;" \
 
       <h3 id="p-upstream-fields">Response Fields</h3>
       <div class="section-box">
+        <div class="section-box-header"><code>funding_scope</code> &mdash; what the funding breakdown covers</div>
+        <div class="field"><span class="field-name">describes</span><span class="field-type">string</span><span class="field-desc"><code>address_inflows</code>. The breakdown describes money arriving at this ADDRESS.</span></div>
+        <div class="field"><span class="field-name">per_transfer</span><span class="field-type">boolean</span><span class="field-desc">Always <code>false</code>. These shares do NOT describe the funds of any single transfer, and a per-transfer origin breakdown is not available from this endpoint.</span></div>
+        <div class="field"><span class="field-name">max_transfers_sampled</span><span class="field-type">integer</span><span class="field-desc">Cap on the number of inflows inspected.</span></div>
+        <div class="field"><span class="field-name">window_seconds</span><span class="field-type">integer</span><span class="field-desc">How far back the sample reaches, in seconds. Converted to blocks per network, since Ethereum and Tron settle at different rates.</span></div>
+        <div class="field"><span class="field-name">anchored_to</span><span class="field-type">string</span><span class="field-desc"><code>address_last_activity</code>, or <code>requested_block</code> when <code>block</code> was supplied. The window is anchored to the address rather than to the chain head, so a wallet that stopped transacting a year ago still returns a breakdown.</span></div>
+        <div class="field"><span class="field-name">denominator</span><span class="field-type">string</span><span class="field-desc">Base the shares are computed over.</span></div>
+        <div class="field"><span class="field-name">denominator_value</span><span class="field-type">number</span><span class="field-desc">Absolute value of that base.</span></div>
+      </div>
+
+      <div class="section-box">
         <div class="section-box-header"><code>report</code> &mdash; identity, completeness and data freshness</div>
         <div class="field"><span class="field-name">report_id</span><span class="field-type">string</span><span class="field-desc">Identifies this result: <code>rpt_</code> + 32 hex. Deterministic &mdash; identical inputs return an identical id, and it changes whenever anything affecting the answer changes (new data, new model version, different <code>block</code>). Re-reading a finished report is therefore distinguishable from a fresh recalculation. Not a random UUID.</span></div>
         <div class="field"><span class="field-name">status</span><span class="field-type">string</span><span class="field-desc"><code>complete</code> &mdash; analysis ran in full. <code>partial</code> &mdash; a component was unavailable; the score is preliminary. <code>unavailable</code> &mdash; no analysis was performed. <strong>Branch on this before reading <code>score</code>.</strong></span></div>
-        <div class="field"><span class="field-name">reason</span><span class="field-type">string</span><span class="field-desc">Present only when <code>status != complete</code>. Current values: <code>CACHE_WARMING</code>, <code>COUNTERPARTY_LOOKUP_FAILED</code>, <code>ENTITY_GEO_LOOKUP_FAILED</code>, <code>RELATED_ENTITIES_LOOKUP_FAILED</code>, <code>AGGREGATES_NOT_BUILT</code>. Treat unknown values as partial.</span></div>
+        <div class="field"><span class="field-name">reason</span><span class="field-type">string</span><span class="field-desc">Present only when <code>status != complete</code>. Current values: <code>CACHE_WARMING</code>, <code>GRAPH_BEHIND_REQUESTED_BLOCK</code>, <code>COUNTERPARTY_LOOKUP_FAILED</code>, <code>ENTITY_GEO_LOOKUP_FAILED</code>, <code>RELATED_ENTITIES_LOOKUP_FAILED</code>, <code>AGGREGATES_NOT_BUILT</code>. Treat unknown values as partial.</span></div>
         <div class="field"><span class="field-name">coverage</span><span class="field-type">string</span><span class="field-desc"><code>full</code> &mdash; the address has history and it was analysed. <code>no_history</code> &mdash; a valid address with zero transfers; distinct from "could not analyse". <code>partial_history</code> &mdash; history exists but was not fully covered.</span></div>
         <div class="field"><span class="field-name">is_final</span><span class="field-type">boolean</span><span class="field-desc">True only when <code>status = complete</code>. A final report is reproducible: identical inputs return a byte-identical payload.</span></div>
         <div class="field"><span class="field-name">preliminary</span><span class="field-type">boolean</span><span class="field-desc">Inverse of <code>is_final</code>. A preliminary score is never presented as final.</span></div>
@@ -1049,6 +1112,11 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">data_as_of.chain_head_block</span><span class="field-type">integer</span><span class="field-desc">Highest block indexed for this network.</span></div>
         <div class="field"><span class="field-name">data_as_of.graph_block</span><span class="field-type">integer</span><span class="field-desc">Block up to which the exposure graph is computed.</span></div>
         <div class="field"><span class="field-name">data_as_of.graph_lag_blocks</span><span class="field-type">integer</span><span class="field-desc">Difference between the two. Wallet activity is current to the chain head; graph exposure is current to <code>graph_block</code>. Index lag is therefore visible and never looks like an absent wallet history.</span></div>
+        <div class="field"><span class="field-name">data_as_of.chain_head_utc</span><span class="field-type">string</span><span class="field-desc">ISO-8601 UTC of <code>chain_head_block</code>.</span></div>
+        <div class="field"><span class="field-name">data_as_of.graph_utc</span><span class="field-type">string</span><span class="field-desc">ISO-8601 UTC of <code>graph_block</code>.</span></div>
+        <div class="field"><span class="field-name">data_as_of.graph_lag_seconds</span><span class="field-type">integer</span><span class="field-desc">Head minus graph in SECONDS, or <code>-1</code> when unknown. A lag in blocks is not comparable across networks - Ethereum settles every ~12 s, Tron every ~3 s - so a deposit-freshness decision should use this.</span></div>
+        <div class="field"><span class="field-name">data_as_of.graph_covers_requested_block</span><span class="field-type">boolean</span><span class="field-desc">Present only when <code>block</code> was supplied. Whether the exposure graph had reached that block. <code>false</code> means activity is answerable and exposure is not.</span></div>
+        <div class="field"><span class="field-name">data_version</span><span class="field-type">string</span><span class="field-desc">Version of the reference DATA, separate from <code>model_version</code>. Label and sanctions data move independently of the code, so a rerun after a sync can differ from the same model. Two reports sharing both versions were computed from the same code, settings and reference data.</span></div>
       </div>
 
       <div class="section-box">
@@ -1068,7 +1136,7 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">blacklist_note</span><span class="field-type">string</span><span class="field-desc">Human-readable basis for the flag.</span></div>
         <div class="field"><span class="field-name">risk_sources_count</span><span class="field-type">integer</span><span class="field-desc">Number of distinct flagged sources this address is connected to.</span></div>
         <div class="field"><span class="field-name">risk_sources_note</span><span class="field-type">string</span><span class="field-desc">Describes what the count refers to.</span></div>
-        <div class="field"><span class="field-name">score_zones[]</span><span class="field-type">array</span><span class="field-desc"><code>{ label, range_min, range_max }</code>. Published bands: Very Low 0&ndash;25, Low 26&ndash;40, Medium 41&ndash;50, High 51&ndash;75, Very High 76&ndash;100.</span></div>
+        <div class="field"><span class="field-name">score_zones[]</span><span class="field-type">array</span><span class="field-desc"><code>{ label, range_min, range_max, min_inclusive, max_exclusive }</code>. Bands: Very Low, Low, Medium, High, Very High. <strong>Classify on <code>min_inclusive</code> / <code>max_exclusive</code></strong>: the integer pair leaves gaps, so a score of 25.45 belongs to neither <code>0-25</code> nor <code>26-40</code>. <code>range_min</code> / <code>range_max</code> are retained unchanged for existing readers.</span></div>
       </div>
 
       <div class="section-box">
@@ -1097,7 +1165,10 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">risk_bearing</span><span class="field-type">boolean</span><span class="field-desc">True when this funder carries a risk attribution. False for merely unattributed funders.</span></div>
         <div class="field"><span class="field-name">source</span><span class="field-type">string</span><span class="field-desc">List or registry that produced the attribution. Empty when unattributed.</span></div>
         <div class="field"><span class="field-name">transfer_count</span><span class="field-type">integer</span><span class="field-desc">Number of transfers behind this share.</span></div>
-        <div class="field"><span class="field-name">denominator</span><span class="field-type">string</span><span class="field-desc"><code>total_priced_inflow_usd</code>, or <code>incoming_transfer_count</code> when nothing received carries a price. <strong>Read this before comparing shares.</strong></span></div>
+        <div class="field"><span class="field-name">denominator</span><span class="field-type">string</span><span class="field-desc"><code>sampled_inflow_usd</code>, or <code>sampled_inflow_transfers</code> when nothing received carries a price. <strong>Note the name.</strong> This section sums a bounded recent SAMPLE of inflows, so its base is smaller than the factor denominators and a category share here can legitimately be lower than one factor&rsquo;s share within it. Previously labelled <code>total_priced_inflow_usd</code>, which was wrong for a sampled base.</span></div>
+        <div class="field"><span class="field-name">denominator_value</span><span class="field-type">number</span><span class="field-desc">Absolute value of the base this share is computed over.</span></div>
+        <div class="field"><span class="field-name">value</span><span class="field-type">number</span><span class="field-desc">Absolute value of THIS row, in the unit named by <code>denominator</code>.</span></div>
+        <div class="field"><span class="field-name">share_pct_exact</span><span class="field-type">number</span><span class="field-desc">Share to five decimals. <code>percentage</code> rounds to one, so a small but real share prints as <code>0.0</code> and reads as excluded when it is only below display precision. Use this pair to tell rounding from exclusion.</span></div>
       </div>
 
       <div class="section-box">
@@ -1131,8 +1202,15 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">hops</span><span class="field-type">integer</span><span class="field-desc">Real distance. <code>0</code> = the address itself. <code>-1</code> = a path exists but was not resolved because an intervening service breaks the chain of custody; the severity is still reported.</span></div>
         <div class="field"><span class="field-name">share_pct</span><span class="field-type">number</span><span class="field-desc">Share of the denominator attributable to this finding.</span></div>
         <div class="field"><span class="field-name">amount_usd</span><span class="field-type">number</span><span class="field-desc">Absolute value attributable to this finding. Use alongside <code>share_pct</code>: a small share of a large balance is material, a small share of a small one is not.</span></div>
-        <div class="field"><span class="field-name">denominator</span><span class="field-type">string</span><span class="field-desc">What <code>share_pct</code> is a share of &mdash; <code>total_priced_inflow_usd</code> or <code>incoming_transfer_count</code>.</span></div>
-        <div class="field"><span class="field-name">contribution_points</span><span class="field-type">number</span><span class="field-desc">Points this component contributed.</span></div>
+        <div class="field"><span class="field-name">denominator</span><span class="field-type">string</span><span class="field-desc">What <code>share_pct</code> is a share OF. These are genuinely different bases and must not be compared across factors: <code>total_priced_inflow_usd</code> (current activity total), <code>graph_priced_inflow_usd</code> (the inflow the graph priced at its own watermark, used by <code>indirect_exposure</code>), <code>incoming_transfer_count</code> (no inflow is priced), or <code>not_applicable</code> (a direct listing is an identification, not a proportion).</span></div>
+        <div class="field"><span class="field-name">denominator_value_usd</span><span class="field-type">number | null</span><span class="field-desc">ABSOLUTE value of the base, so a share can be verified and not merely compared: <code>share_pct &asymp; amount_usd / denominator_value_usd &times; 100</code>. <code>null</code> when the denominator is <code>not_applicable</code>.</span></div>
+        <div class="field"><span class="field-name">candidate_points</span><span class="field-type">number</span><span class="field-desc">What this factor would contribute if it decided the score.</span></div>
+        <div class="field"><span class="field-name">applied</span><span class="field-type">boolean</span><span class="field-desc">Whether it reached the score. The combination is a <strong>max</strong>, so a real finding can be reported and still not be what set the number.</span></div>
+        <div class="field"><span class="field-name">effective_points</span><span class="field-type">number</span><span class="field-desc"><code>candidate_points</code> when applied, otherwise <code>0</code>.</span></div>
+        <div class="field"><span class="field-name">exclusion_reason</span><span class="field-type">string</span><span class="field-desc">Why it was not applied, e.g. <code>superseded_by:counterparty</code> or <code>recognised_project_contract_scored_zero</code>. Empty when applied.</span></div>
+        <div class="field"><span class="field-name">source_addresses</span><span class="field-type">string[]</span><span class="field-desc">The addresses the finding is built from, capped at a sample. A counterparty line groups by severity, so several addresses can merge into one row.</span></div>
+        <div class="field"><span class="field-name">source_count</span><span class="field-type">integer</span><span class="field-desc">True number of sources, which may exceed the length of <code>source_addresses</code>.</span></div>
+        <div class="field"><span class="field-name">contribution_points</span><span class="field-type">number</span><span class="field-desc">Unchanged alias of <code>candidate_points</code>, kept for existing readers.</span></div>
         <div class="field"><span class="field-name">detail</span><span class="field-type">string</span><span class="field-desc">One-sentence summary for a reviewer.</span></div>
       </div>
 
@@ -1151,6 +1229,9 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">service_basis</span><span class="field-type">string</span><span class="field-desc">Why that determination was made, e.g. <code>named service</code>, <code>high-throughput service</code>, <code>not a service</code>.</span></div>
         <div class="field"><span class="field-name">score</span><span class="field-type">number</span><span class="field-desc">The final score, repeated for convenience.</span></div>
         <div class="field"><span class="field-name">degraded_lookups[]</span><span class="field-type">array</span><span class="field-desc">Components that failed. Non-empty implies <code>status: partial</code>. A failed lookup lowers the score mechanically, so it must not be read as a cleaner address.</span></div>
+        <div class="field"><span class="field-name">decided_by</span><span class="field-type">string</span><span class="field-desc">Which component set the score: <code>direct_listing</code>, <code>counterparty</code>, <code>indirect_exposure</code>, <code>activity_baseline</code>, <code>contract_allowlist</code> or <code>none</code>.</span></div>
+        <div class="field"><span class="field-name">decided_by_category</span><span class="field-type">string</span><span class="field-desc">Category code of the deciding finding.</span></div>
+        <div class="field"><span class="field-name">decided_by_list_type</span><span class="field-type">string</span><span class="field-desc">List type of the deciding finding. <code>operator_rating</code> means our own rating of a service, NOT a sanctions match.</span></div>
         <div class="field"><span class="field-name">note</span><span class="field-type">string</span><span class="field-desc"><strong>Components are not additive &mdash; the score is not their sum.</strong></span></div>
       </div>
 
@@ -1261,8 +1342,9 @@ curl -H "X-apikey: &lt;key&gt;" \
               <td>A report was produced. Read <code>report.status</code> to tell a completed
                   analysis from a partial one.</td></tr>
           <tr><td><span class="status-code s400">400</span></td><td><code>{ code, field, message }</code></td>
-              <td><code>INVALID_ADDRESS</code> or <code>UNSUPPORTED_CHAIN</code>. The address or
-                  network could not be accepted, so no score is returned.</td></tr>
+              <td><code>INVALID_ADDRESS</code>, <code>UNSUPPORTED_CHAIN</code>,
+                  <code>INVALID_BLOCK</code> or <code>BLOCK_IN_FUTURE</code>. The request could not
+                  be accepted, so no score is returned.</td></tr>
           <tr><td><span class="status-code s401">401</span></td><td><code>{ error, message, request_id }</code></td>
               <td>Missing or invalid <code>X-apikey</code>.</td></tr>
           <tr><td><span class="status-code s403">403</span></td><td><code>{ error, message, request_id }</code></td>
@@ -1287,7 +1369,9 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">4</span><span class="field-type">block</span><span class="field-desc"><code>wallet.entity_tag = "Smart contract"</code> on a plain transfer. Tokens sent to a token contract are unrecoverable &mdash; a loss case, not a risk case.</span></div>
         <div class="field"><span class="field-name">5</span><span class="field-type">review</span><span class="field-desc">A <code>funded_by_entity_type_distribution[]</code> entry whose <code>category_code</code> you do not accept, above a share you choose. A rated venue contributes to the score without reaching the top band on its own, so threshold on the category where that matters.</span></div>
         <div class="field"><span class="field-name">6</span><span class="field-type">warn</span><span class="field-desc"><code>coverage = "no_history"</code>. Unexamined, not proven clean.</span></div>
-        <div class="field"><span class="field-name">7</span><span class="field-type">note</span><span class="field-desc">Use <code>score</code>, never <code>risk_level</code>, in logic &mdash; there is no <em>MEDIUM</em> label, so 41&ndash;50 reads <code>LOW RISK</code>.</span></div>
+        <div class="field"><span class="field-name">7</span><span class="field-type">note</span><span class="field-desc">Use <code>score</code>, never <code>risk_level</code>, in logic &mdash; there is no <em>MEDIUM</em> label, so 41&ndash;50 reads <code>LOW RISK</code>. Classify with <code>score_zones[].min_inclusive</code> / <code>max_exclusive</code>.</span></div>
+        <div class="field"><span class="field-name">8</span><span class="field-type">note</span><span class="field-desc">Do not compare <code>share_pct</code> across factors &mdash; the bases differ. Divide <code>amount_usd</code> by <code>denominator_value_usd</code> instead.</span></div>
+        <div class="field"><span class="field-name">9</span><span class="field-type">note</span><span class="field-desc">For deposit screening, check <code>data_as_of.graph_lag_seconds</code>: a transfer newer than <code>graph_block</code> is not yet in the exposure graph, even when <code>status</code> is <code>complete</code>.</span></div>
       </div>
 
     </section>
