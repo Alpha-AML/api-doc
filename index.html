@@ -659,7 +659,7 @@
         </tbody>
       </table>
 
-      <div class="note"><strong>Schema 1.3.1 — one breaking change.</strong> The top-level <code>funding_entity_types</code> array was <strong>removed</strong>. The same data now lives at <code>sender_report.funding.distribution</code> (and the receiver's is available too, which it was not before). Everything else in 1.2.15 is unchanged; all other additions are new fields.</div>
+      <div class="note"><strong>Schema 1.3.1 — one breaking change.</strong> The top-level <code>funding_entity_types</code> array was <strong>removed</strong>. The same data now lives at <code>sender_report.funding.distribution</code> (and the receiver's is available too, which it was not before). Everything else in 1.2.15 is unchanged; all other additions are new fields — among them <code>&lt;side&gt;_report.post_graph_exposure</code> and <code>&lt;side&gt;_report.data_as_of.exposure_checked_to_chain_head</code>, which carry the engine's post-graph exposure check through per side.</div>
 
       <h3>Response Fields (200 OK JSON)</h3>
       <div class="section-box">
@@ -699,11 +699,12 @@
         <div class="field"><span class="field-name">model_version</span><span class="field-type">string</span><span class="field-desc">Risk model version that produced the score.</span></div>
         <div class="field"><span class="field-name">data_version</span><span class="field-type">string</span><span class="field-desc">Digest of the reference-data state. <code>model_version</code> alone cannot reproduce a score once labels sync; both together can.</span></div>
         <div class="field"><span class="field-name">generated_at_utc</span><span class="field-type">string</span><span class="field-desc">When this report was generated.</span></div>
-        <div class="field"><span class="field-name">data_as_of</span><span class="field-type">object</span><span class="field-desc">Freshness: <code>chain_head_block</code> / <code>chain_head_utc</code>, <code>graph_block</code> / <code>graph_utc</code>, <code>graph_lag_blocks</code> / <code>graph_lag_seconds</code>, <code>requested_block</code> (this transfer's block) and <strong><code>graph_covers_requested_block</code></strong> — whether the exposure graph actually reached the block being checked. Activity is current to <code>chain_head_block</code>; exposure only to <code>graph_block</code>.</span></div>
+        <div class="field"><span class="field-name">data_as_of</span><span class="field-type">object</span><span class="field-desc">Freshness: <code>chain_head_block</code> / <code>chain_head_utc</code>, <code>graph_block</code> / <code>graph_utc</code>, <code>graph_lag_blocks</code> / <code>graph_lag_seconds</code>, <code>requested_block</code> (this transfer's block), <strong><code>graph_covers_requested_block</code></strong> — whether the exposure graph actually reached the block being checked — and <strong><code>exposure_checked_to_chain_head</code></strong>, whether value received after <code>graph_block</code> was examined at request time. Activity is current to <code>chain_head_block</code>; traced exposure only to <code>graph_block</code>, and the gap between the two is what <code>post_graph_exposure</code> below covers.</span></div>
         <div class="field"><span class="field-name">risk_score</span><span class="field-type">number</span><span class="field-desc">0–100, or <code>null</code> when not scored.</span></div>
         <div class="field"><span class="field-name">risk_level</span><span class="field-type">string</span><span class="field-desc">Tier label for <code>risk_score</code>.</span></div>
         <div class="field"><span class="field-name">blacklisted / blacklist_note</span><span class="field-type">boolean / string</span><span class="field-desc">Direct blacklist match and its note.</span></div>
         <div class="field"><span class="field-name">score_breakdown</span><span class="field-type">object</span><span class="field-desc">Components (<code>direct_listing</code>, <code>counterparty</code>, <code>indirect_exposure</code>, <code>concentration</code>, <code>activity_baseline</code>, <code>entity_penalty</code>, <code>geo_penalty</code>) plus <code>decided_by</code>, <code>decided_by_category</code>, <code>decided_by_list_type</code>. <strong>Components are not additive — the score is the strongest of them</strong>, and <code>decided_by</code> names the one that set it. <code>decided_by_list_type: operator_rating</code> means our own rating of a service, not a sanctions match.</span></div>
+        <div class="field"><span class="field-name">post_graph_exposure</span><span class="field-type">object</span><span class="field-desc">Exposure found in the window <strong>after <code>data_as_of.graph_block</code>, up to <code>chain_head_block</code></strong> — value received from addresses the last graph pass had already judged, checked at request time. <strong>This is the window a freshly-mined transfer falls into</strong>, so when screening a deposit by its hash this is the field that says whether value newer than the graph was examined rather than simply absent from the assessment. Carries <code>status</code>, <code>tainted_usd</code>, <code>share_of_received_pct</code>, <code>transfer_count</code>, <code>source_count</code>, <code>senders_examined</code>, <code>source_addresses</code>, <code>category_code</code>, <code>from_block</code> / <code>last_block</code> / <code>last_utc</code>, <code>window</code> and <code>note</code>. <strong>Treat it as a floor on exposure in that window, not the whole of it</strong>: hop-1 only, limited to senders already judged, to the largest <code>senders_examined</code> of them by value, and to priced assets — the next graph pass traces the rest. <code>status: "none"</code> with empty values means the window was examined and nothing matched, which is not the same as not having been checked — <code>data_as_of.exposure_checked_to_chain_head</code> distinguishes the two. See <a href="#p-upstream-fields">report-v1’s <code>risk_factors.post_graph_exposure</code></a> for a populated example.</span></div>
         <div class="field"><span class="field-name">factors</span><span class="field-type">array</span><span class="field-desc">Per-finding detail: <code>kind</code>, <code>category_code</code> / <code>category_label</code>, <code>entity_class</code>, <code>list_type</code>, <code>source</code>, <code>entity</code>, <code>jurisdiction</code>, <code>severity</code>, <code>directness</code>, <code>hops</code>, <code>share_pct</code>, <code>amount_usd</code>, <code>denominator</code> / <code>denominator_value_usd</code>, <code>source_addresses</code> / <code>source_count</code>, <code>candidate_points</code> / <code>effective_points</code>, <code>applied</code>, <code>exclusion_reason</code>, <code>detail</code>. A finding can be reported with <code>applied: false</code> — real, but not what set the score.</span></div>
         <div class="field"><span class="field-name">excluded_below_threshold</span><span class="field-type">object</span><span class="field-desc"><code>tainted_usd</code>, <code>source_count</code>, <code>rule</code>. Exposure below the materiality threshold, reported separately from a true zero. The test is on the absolute USD figure, not the share.</span></div>
         <div class="field"><span class="field-name">funding.scope</span><span class="field-type">object</span><span class="field-desc"><code>describes</code>, <strong><code>per_transfer</code></strong>, <code>max_transfers_sampled</code>, <code>window_seconds</code>, <code>anchored_to</code>, <code>denominator</code> / <code>denominator_value</code>. <code>per_transfer: false</code> means the shares describe a bounded sample of <em>this address's inflows</em> — not the funds of this transfer. Do not multiply <code>amount</code> by a share to get a risk figure.</span></div>
@@ -755,7 +756,8 @@
       <span class="json-key">"graph_lag_blocks"</span>: <span class="json-num">1415</span>,
       <span class="json-key">"graph_lag_seconds"</span>: <span class="json-num">17052</span>,
       <span class="json-key">"requested_block"</span>: <span class="json-num">23612901</span>,
-      <span class="json-key">"graph_covers_requested_block"</span>: <span class="json-bool">true</span>
+      <span class="json-key">"graph_covers_requested_block"</span>: <span class="json-bool">true</span>,
+      <span class="json-key">"exposure_checked_to_chain_head"</span>: <span class="json-bool">true</span>
     },
     <span class="json-key">"risk_score"</span>: <span class="json-num">55</span>,
     <span class="json-key">"risk_level"</span>: <span class="json-str">"HIGH RISK"</span>,
@@ -770,6 +772,20 @@
       <span class="json-key">"decided_by_category"</span>: <span class="json-str">"medium_reputation_service"</span>,
       <span class="json-key">"decided_by_list_type"</span>: <span class="json-str">"operator_rating"</span>,
       <span class="json-key">"note"</span>: <span class="json-str">"Components are not additive; the score is the strongest of them."</span>
+    },
+    <span class="json-key">"post_graph_exposure"</span>: {
+      <span class="json-key">"status"</span>: <span class="json-str">"none"</span>,
+      <span class="json-key">"tainted_usd"</span>: <span class="json-num">0.0</span>,
+      <span class="json-key">"share_of_received_pct"</span>: <span class="json-num">0.0</span>,
+      <span class="json-key">"transfer_count"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"source_count"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"senders_examined"</span>: <span class="json-num">64</span>,
+      <span class="json-key">"source_addresses"</span>: [],
+      <span class="json-key">"category_code"</span>: <span class="json-str">""</span>,
+      <span class="json-key">"from_block"</span>: <span class="json-num">26231131</span>,
+      <span class="json-key">"last_block"</span>: <span class="json-num">26232545</span>,
+      <span class="json-key">"last_utc"</span>: <span class="json-str">""</span>,
+      <span class="json-key">"window"</span>: <span class="json-str">"after graph_block, to chain_head_block"</span>
     },
     <span class="json-key">"factors"</span>: [
       {
@@ -836,6 +852,7 @@
     <span class="json-key">"risk_score"</span>: <span class="json-num">24.75</span>,
     <span class="json-key">"risk_level"</span>: <span class="json-str">"VERY LOW RISK"</span>,
     <span class="json-key">"score_breakdown"</span>: { <span class="json-key">"score"</span>: <span class="json-num">24.75</span>, <span class="json-key">"decided_by"</span>: <span class="json-str">"activity_baseline"</span> },
+    <span class="json-key">"post_graph_exposure"</span>: { <span class="json-key">"status"</span>: <span class="json-str">"none"</span>, <span class="json-key">"senders_examined"</span>: <span class="json-num">12</span>, <span class="json-key">"tainted_usd"</span>: <span class="json-num">0.0</span> },
     <span class="json-key">"factors"</span>: [],
     <span class="json-key">"funding"</span>: { <span class="json-key">"scope"</span>: { <span class="json-key">"per_transfer"</span>: <span class="json-bool">false</span> }, <span class="json-key">"distribution"</span>: [] }
   }
