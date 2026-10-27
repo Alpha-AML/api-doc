@@ -590,7 +590,7 @@
 
     <section id="p-service-tx">
       <h2>GET /api/report/txhash</h2>
-      <p>Resolves a transaction hash to a single transfer, then returns JSON risk metadata for both parties of that transfer. <strong>This endpoint does not generate a PDF</strong> — use <a href="#p-service"><code>/api/report/wallet</code></a> with the returned <code>sender</code> / <code>receiver</code> for the styled report.</p>
+      <p>Resolves a transaction hash to a single transfer, pins the exact log event it analysed, and returns a full risk report for both parties of that transfer — scores plus their provenance (<code>report_id</code>, model and data versions, freshness, score breakdown and per-finding factors). <strong>This endpoint does not generate a PDF</strong> — use <a href="#p-service"><code>/api/report/wallet</code></a> with the returned <code>sender</code> / <code>receiver</code> for the styled report.</p>
       <div class="endpoint-bar">
         <span class="method get">GET</span>
         <span class="ep-path">/api/report/txhash?txHash={txHash}&amp;chain={chain}</span>
@@ -659,42 +659,211 @@
         </tbody>
       </table>
 
+      <div class="note"><strong>Schema 1.3.1 — one breaking change.</strong> The top-level <code>funding_entity_types</code> array was <strong>removed</strong>. The same data now lives at <code>sender_report.funding.distribution</code> (and the receiver's is available too, which it was not before). Everything else in 1.2.15 is unchanged; all other additions are new fields.</div>
+
       <h3>Response Fields (200 OK JSON)</h3>
       <div class="section-box">
-        <div class="section-box-header">application/json <span class="obj-type">— transfer metadata + risk scores</span></div>
-        <div class="field"><span class="field-name">version</span><span class="field-type">string</span><span class="field-desc">Response schema version (e.g. <code>"1.2.15"</code>). Constant until this endpoint's response shape changes.</span></div>
+        <div class="section-box-header">application/json <span class="obj-type">— top level</span></div>
+        <div class="field"><span class="field-name">version</span><span class="field-type">string</span><span class="field-desc">Response <strong>schema</strong> version (<code>"1.3.1"</code>) — <em>not</em> a risk-model version. The scoring model and reference data behind each side are reported per side as <code>model_version</code> / <code>data_version</code>.</span></div>
         <div class="field"><span class="field-name">hash</span><span class="field-type">string</span><span class="field-desc">The transaction hash (echo of <code>txHash</code>).</span></div>
         <div class="field"><span class="field-name">chain</span><span class="field-type">string</span><span class="field-desc">Chain the lookup ran on (echo of <code>chain</code>).</span></div>
+        <div class="field"><span class="field-name">block_number</span><span class="field-type">number</span><span class="field-desc">Block the transfer was mined in.</span></div>
+        <div class="field"><span class="field-name">block_hash</span><span class="field-type">string</span><span class="field-desc">Hash of <code>block_number</code>. Omitted on TRON, which does not expose it on this lookup.</span></div>
+        <div class="field"><span class="field-name">confirmations</span><span class="field-type">number</span><span class="field-desc">Depth of <code>block_number</code>, derived from the engine's <code>chain_head_block</code>. That head can trail the live chain, so this is conservative and never over-reports.</span></div>
+        <div class="field"><span class="field-name">event_index</span><span class="field-type">number</span><span class="field-desc">Index of the log this report <strong>actually analysed</strong> — not an echo of the <code>event_index</code> request parameter. <code>null</code> for a native transfer, which emits no log.</span></div>
+        <div class="field"><span class="field-name">event_index_basis</span><span class="field-type">string</span><span class="field-desc">Numbering scheme behind <code>event_index</code>, because the chains differ: <code>evm_block_log_index</code> (chain-native block-level <code>logIndex</code>, the number explorers show) · <code>tron_log_array_position</code> (position in the transaction's log array — TronGrid exposes no chain-native index) · <code>none_native_transfer</code>.</span></div>
         <div class="field"><span class="field-name">amount</span><span class="field-type">string</span><span class="field-desc">Transferred amount, decimal-adjusted, trailing zeros stripped (e.g. <code>"490.14"</code>).</span></div>
         <div class="field"><span class="field-name">amount_raw</span><span class="field-type">string</span><span class="field-desc">Transferred amount in base units (wei / sun / token base units).</span></div>
         <div class="field"><span class="field-name">asset</span><span class="field-type">string</span><span class="field-desc"><code>"native"</code> for a coin transfer, otherwise the token contract address.</span></div>
         <div class="field"><span class="field-name">decimals</span><span class="field-type">number</span><span class="field-desc">Decimals used for <code>amount</code> — 18 (native EVM), 6 (native TRON), or the token's own.</span></div>
         <div class="field"><span class="field-name">token_symbol</span><span class="field-type">string</span><span class="field-desc">Token symbol if it could be read on-chain; omitted for native transfers or when unavailable.</span></div>
         <div class="field"><span class="field-name">sender</span><span class="field-type">string</span><span class="field-desc">The selected transfer's <code>from</code> address.</span></div>
-        <div class="field"><span class="field-name">funding_entity_types</span><span class="field-type">array</span><span class="field-desc"><strong>Sender only.</strong> The sender's <code>funded_by_entity_type_distribution</code> from the Alpha AML API — <code>[{ label, percentage }]</code>. Omitted if the sender has no funding data.</span></div>
         <div class="field"><span class="field-name">receiver</span><span class="field-type">string</span><span class="field-desc">The selected transfer's <code>to</code> address.</span></div>
-        <div class="field"><span class="field-name">sender_risk_score</span><span class="field-type">number</span><span class="field-desc">0–100 risk score for <code>sender</code>. <code>null</code> if it could not be scored.</span></div>
-        <div class="field"><span class="field-name">receiver_risk_score</span><span class="field-type">number</span><span class="field-desc">0–100 risk score for <code>receiver</code>. <code>null</code> if it could not be scored.</span></div>
+        <div class="field"><span class="field-name">sender_risk_score</span><span class="field-type">number</span><span class="field-desc">0–100 score for <code>sender</code>. <strong><code>null</code> means NOT SCORED</strong> — it is not a low score and must not be read as low risk. See <code>sender_report.status</code> for why.</span></div>
+        <div class="field"><span class="field-name">receiver_risk_score</span><span class="field-type">number</span><span class="field-desc">0–100 score for <code>receiver</code>. Same <code>null</code> semantics as above.</span></div>
+        <div class="field"><span class="field-name">score_zones</span><span class="field-type">array</span><span class="field-desc">Score bands, carrying <code>min_inclusive</code> / <code>max_exclusive</code>. Use that pair for classification — the integer <code>range_min</code> / <code>range_max</code> pair leaves fractional scores unclassified.</span></div>
+        <div class="field"><span class="field-name">sender_report</span><span class="field-type">object</span><span class="field-desc">Full report for the sender — fields below.</span></div>
+        <div class="field"><span class="field-name">receiver_report</span><span class="field-type">object</span><span class="field-desc">Same shape, for the receiver.</span></div>
       </div>
+
+      <div class="section-box">
+        <div class="section-box-header">sender_report / receiver_report <span class="obj-type">— per-side report object</span></div>
+        <div class="field"><span style="grid-column:1/-1;color:var(--muted);font-size:12.5px;">Each side carries the same report structure <code>/api/engine/report-v1</code> returns for that address — see its <a href="#p-upstream-fields">Response Fields</a> for full field semantics and <a href="#p-limits">Rate Limits &amp; Retries</a> for quota behaviour. Summarised below.</span></div>
+        <div class="field"><span class="field-name">address</span><span class="field-type">string</span><span class="field-desc">The address this report is for.</span></div>
+        <div class="field"><span class="field-name">report_id</span><span class="field-type">string</span><span class="field-desc">Identifier of the exact report these numbers came from. Covers <code>data_version</code>, so a label sync changes it — a later standalone wallet lookup may legitimately return a different score.</span></div>
+        <div class="field"><span class="field-name">status</span><span class="field-type">string</span><span class="field-desc"><code>complete</code> / <code>partial</code>. <code>partial</code> means the score is not fully computed — pair it with <code>reason</code>.</span></div>
+        <div class="field"><span class="field-name">coverage</span><span class="field-type">string</span><span class="field-desc">What the report covers, e.g. <code>full</code> / <code>activity_only</code>.</span></div>
+        <div class="field"><span class="field-name">is_final</span><span class="field-type">boolean</span><span class="field-desc">Whether this result is settled or may still change.</span></div>
+        <div class="field"><span class="field-name">preliminary</span><span class="field-type">boolean</span><span class="field-desc">Whether the numeric score is preliminary.</span></div>
+        <div class="field"><span class="field-name">reason</span><span class="field-type">string</span><span class="field-desc">Why a report is not complete, e.g. <code>GRAPH_BEHIND_REQUESTED_BLOCK</code>, <code>CACHE_WARMING</code>, <code>COUNTERPARTY_LOOKUP_FAILED</code>. Empty when complete.</span></div>
+        <div class="field"><span class="field-name">model_version</span><span class="field-type">string</span><span class="field-desc">Risk model version that produced the score.</span></div>
+        <div class="field"><span class="field-name">data_version</span><span class="field-type">string</span><span class="field-desc">Digest of the reference-data state. <code>model_version</code> alone cannot reproduce a score once labels sync; both together can.</span></div>
+        <div class="field"><span class="field-name">generated_at_utc</span><span class="field-type">string</span><span class="field-desc">When this report was generated.</span></div>
+        <div class="field"><span class="field-name">data_as_of</span><span class="field-type">object</span><span class="field-desc">Freshness: <code>chain_head_block</code> / <code>chain_head_utc</code>, <code>graph_block</code> / <code>graph_utc</code>, <code>graph_lag_blocks</code> / <code>graph_lag_seconds</code>, <code>requested_block</code> (this transfer's block) and <strong><code>graph_covers_requested_block</code></strong> — whether the exposure graph actually reached the block being checked. Activity is current to <code>chain_head_block</code>; exposure only to <code>graph_block</code>.</span></div>
+        <div class="field"><span class="field-name">risk_score</span><span class="field-type">number</span><span class="field-desc">0–100, or <code>null</code> when not scored.</span></div>
+        <div class="field"><span class="field-name">risk_level</span><span class="field-type">string</span><span class="field-desc">Tier label for <code>risk_score</code>.</span></div>
+        <div class="field"><span class="field-name">blacklisted / blacklist_note</span><span class="field-type">boolean / string</span><span class="field-desc">Direct blacklist match and its note.</span></div>
+        <div class="field"><span class="field-name">score_breakdown</span><span class="field-type">object</span><span class="field-desc">Components (<code>direct_listing</code>, <code>counterparty</code>, <code>indirect_exposure</code>, <code>concentration</code>, <code>activity_baseline</code>, <code>entity_penalty</code>, <code>geo_penalty</code>) plus <code>decided_by</code>, <code>decided_by_category</code>, <code>decided_by_list_type</code>. <strong>Components are not additive — the score is the strongest of them</strong>, and <code>decided_by</code> names the one that set it. <code>decided_by_list_type: operator_rating</code> means our own rating of a service, not a sanctions match.</span></div>
+        <div class="field"><span class="field-name">factors</span><span class="field-type">array</span><span class="field-desc">Per-finding detail: <code>kind</code>, <code>category_code</code> / <code>category_label</code>, <code>entity_class</code>, <code>list_type</code>, <code>source</code>, <code>entity</code>, <code>jurisdiction</code>, <code>severity</code>, <code>directness</code>, <code>hops</code>, <code>share_pct</code>, <code>amount_usd</code>, <code>denominator</code> / <code>denominator_value_usd</code>, <code>source_addresses</code> / <code>source_count</code>, <code>candidate_points</code> / <code>effective_points</code>, <code>applied</code>, <code>exclusion_reason</code>, <code>detail</code>. A finding can be reported with <code>applied: false</code> — real, but not what set the score.</span></div>
+        <div class="field"><span class="field-name">excluded_below_threshold</span><span class="field-type">object</span><span class="field-desc"><code>tainted_usd</code>, <code>source_count</code>, <code>rule</code>. Exposure below the materiality threshold, reported separately from a true zero. The test is on the absolute USD figure, not the share.</span></div>
+        <div class="field"><span class="field-name">funding.scope</span><span class="field-type">object</span><span class="field-desc"><code>describes</code>, <strong><code>per_transfer</code></strong>, <code>max_transfers_sampled</code>, <code>window_seconds</code>, <code>anchored_to</code>, <code>denominator</code> / <code>denominator_value</code>. <code>per_transfer: false</code> means the shares describe a bounded sample of <em>this address's inflows</em> — not the funds of this transfer. Do not multiply <code>amount</code> by a share to get a risk figure.</span></div>
+        <div class="field"><span class="field-name">funding.distribution</span><span class="field-type">array</span><span class="field-desc">Per row: <code>label</code>, <code>percentage</code> (rounded to 1 dp), <strong><code>share_pct_exact</code></strong> (5 dp — a small real share prints as <code>0.0</code> in <code>percentage</code>), <code>value</code> (absolute, in the unit named by <code>denominator</code>), <code>denominator</code> / <code>denominator_value</code>, <code>category_code</code> / <code>category_label</code>, <code>entity_class</code>, <code>risk_bearing</code>, <code>source</code>, <code>transfer_count</code>.</span></div>
+        <div class="field"><span class="field-name">entity_attribution</span><span class="field-type">object</span><span class="field-desc">Company/person attribution and address label. <code>none_held</code> means attribution is unknown — which is not the same as clean.</span></div>
+        <div class="field"><span class="field-name">jurisdiction_risk</span><span class="field-type">object</span><span class="field-desc">Linked jurisdictions, listed counts, applied penalty. A contributing factor, not a verdict; an empty list means none was found.</span></div>
+        <div class="field"><span class="field-name">related_entities</span><span class="field-type">object</span><span class="field-desc">Named counterparties only; anonymous ones are not listed.</span></div>
+      </div>
+
+      <div class="note"><strong>Scope of this endpoint.</strong> It identifies one transfer, pins the event it analysed, and scores the transfer's two <em>addresses</em>. It does <strong>not</strong> attribute the origin of the transferred amount itself — no allocation rule (proportional / FIFO) or time cut is applied to the selected transfer. See <code>&lt;side&gt;_report.funding.scope.per_transfer</code>.</div>
 
       <h3>Example Response</h3>
       <pre>{
-  <span class="json-key">"version"</span>: <span class="json-str">"1.2.15"</span>,
-  <span class="json-key">"hash"</span>: <span class="json-str">"0x3421c1fb88ab5962400c904f874ed3ba850c2121e2216433c6c8034872b48d9f"</span>,
+  <span class="json-key">"version"</span>: <span class="json-str">"1.3.1"</span>,
+  <span class="json-key">"hash"</span>: <span class="json-str">"0x7660631c30ca9befe961e2910b30c92fbe910a7a7156e41337912c616240cd16"</span>,
   <span class="json-key">"chain"</span>: <span class="json-str">"eth"</span>,
-  <span class="json-key">"amount"</span>: <span class="json-str">"490.14"</span>,
-  <span class="json-key">"amount_raw"</span>: <span class="json-str">"490140000"</span>,
-  <span class="json-key">"asset"</span>: <span class="json-str">"0xdac17f958d2ee523a2206206994597c13d831ec7"</span>,
+  <span class="json-key">"block_number"</span>: <span class="json-num">23612901</span>,
+  <span class="json-key">"block_hash"</span>: <span class="json-str">"0x9f2c4b8e1d3a77c0e5b9a2f84c16d05e7a3b9c1f2e8d4a60b7c3f51e9d82a04c"</span>,
+  <span class="json-key">"confirmations"</span>: <span class="json-num">14207</span>,
+  <span class="json-key">"event_index"</span>: <span class="json-num">95</span>,
+  <span class="json-key">"event_index_basis"</span>: <span class="json-str">"evm_block_log_index"</span>,
+  <span class="json-key">"amount"</span>: <span class="json-str">"26500.97"</span>,
+  <span class="json-key">"amount_raw"</span>: <span class="json-str">"26500970000"</span>,
+  <span class="json-key">"asset"</span>: <span class="json-str">"0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"</span>,
   <span class="json-key">"decimals"</span>: <span class="json-num">6</span>,
-  <span class="json-key">"token_symbol"</span>: <span class="json-str">"USDT"</span>,
-  <span class="json-key">"sender"</span>: <span class="json-str">"0x559432e18b281731c054cd703d4b49872be4ed53"</span>,
-  <span class="json-key">"funding_entity_types"</span>: [
-    { <span class="json-key">"label"</span>: <span class="json-str">"CEX associated addresses"</span>, <span class="json-key">"percentage"</span>: <span class="json-num">4.1</span> },
-    { <span class="json-key">"label"</span>: <span class="json-str">"Unknown"</span>, <span class="json-key">"percentage"</span>: <span class="json-num">95.9</span> }
+  <span class="json-key">"token_symbol"</span>: <span class="json-str">"USDC"</span>,
+  <span class="json-key">"sender"</span>: <span class="json-str">"0x935f64b44b5c48a1539c4ada5161d27ace4205b5"</span>,
+  <span class="json-key">"receiver"</span>: <span class="json-str">"0x7547463fe4d6b3a5efc8540af5f7cc0665475bd8"</span>,
+  <span class="json-key">"sender_risk_score"</span>: <span class="json-num">55</span>,
+  <span class="json-key">"receiver_risk_score"</span>: <span class="json-num">24.75</span>,
+  <span class="json-key">"score_zones"</span>: [
+    { <span class="json-key">"label"</span>: <span class="json-str">"Very Low"</span>, <span class="json-key">"range_min"</span>: <span class="json-num">0</span>, <span class="json-key">"range_max"</span>: <span class="json-num">25</span>, <span class="json-key">"min_inclusive"</span>: <span class="json-num">0.0</span>, <span class="json-key">"max_exclusive"</span>: <span class="json-num">26.0</span> },
+    { <span class="json-key">"label"</span>: <span class="json-str">"High"</span>, <span class="json-key">"range_min"</span>: <span class="json-num">51</span>, <span class="json-key">"range_max"</span>: <span class="json-num">75</span>, <span class="json-key">"min_inclusive"</span>: <span class="json-num">51.0</span>, <span class="json-key">"max_exclusive"</span>: <span class="json-num">76.0</span> }
   ],
-  <span class="json-key">"receiver"</span>: <span class="json-str">"0xce439010a76d8f8bf37fb29023eec47c9044b099"</span>,
-  <span class="json-key">"sender_risk_score"</span>: <span class="json-num">12.5</span>,
-  <span class="json-key">"receiver_risk_score"</span>: <span class="json-num">12.5</span>
+  <span class="json-key">"sender_report"</span>: {
+    <span class="json-key">"address"</span>: <span class="json-str">"0x935f64b44b5c48a1539c4ada5161d27ace4205b5"</span>,
+    <span class="json-key">"report_id"</span>: <span class="json-str">"rpt_4c1f09a7be83d215cc90aa47e1f2b6d8"</span>,
+    <span class="json-key">"status"</span>: <span class="json-str">"complete"</span>,
+    <span class="json-key">"coverage"</span>: <span class="json-str">"full"</span>,
+    <span class="json-key">"is_final"</span>: <span class="json-bool">true</span>,
+    <span class="json-key">"preliminary"</span>: <span class="json-bool">false</span>,
+    <span class="json-key">"reason"</span>: <span class="json-str">""</span>,
+    <span class="json-key">"model_version"</span>: <span class="json-str">"4.3.0-da50fad0"</span>,
+    <span class="json-key">"data_version"</span>: <span class="json-str">"b866bd64"</span>,
+    <span class="json-key">"generated_at_utc"</span>: <span class="json-str">"2026-10-20T08:17:24Z"</span>,
+    <span class="json-key">"data_as_of"</span>: {
+      <span class="json-key">"chain_head_block"</span>: <span class="json-num">26232545</span>,
+      <span class="json-key">"graph_block"</span>: <span class="json-num">26231130</span>,
+      <span class="json-key">"graph_lag_blocks"</span>: <span class="json-num">1415</span>,
+      <span class="json-key">"graph_lag_seconds"</span>: <span class="json-num">17052</span>,
+      <span class="json-key">"requested_block"</span>: <span class="json-num">23612901</span>,
+      <span class="json-key">"graph_covers_requested_block"</span>: <span class="json-bool">true</span>
+    },
+    <span class="json-key">"risk_score"</span>: <span class="json-num">55</span>,
+    <span class="json-key">"risk_level"</span>: <span class="json-str">"HIGH RISK"</span>,
+    <span class="json-key">"blacklisted"</span>: <span class="json-bool">false</span>,
+    <span class="json-key">"score_breakdown"</span>: {
+      <span class="json-key">"direct_listing"</span>: <span class="json-num">0.0</span>,
+      <span class="json-key">"counterparty"</span>: <span class="json-num">55.0</span>,
+      <span class="json-key">"indirect_exposure"</span>: <span class="json-num">21.4</span>,
+      <span class="json-key">"activity_baseline"</span>: <span class="json-num">18.7</span>,
+      <span class="json-key">"score"</span>: <span class="json-num">55.0</span>,
+      <span class="json-key">"decided_by"</span>: <span class="json-str">"counterparty"</span>,
+      <span class="json-key">"decided_by_category"</span>: <span class="json-str">"medium_reputation_service"</span>,
+      <span class="json-key">"decided_by_list_type"</span>: <span class="json-str">"operator_rating"</span>,
+      <span class="json-key">"note"</span>: <span class="json-str">"Components are not additive; the score is the strongest of them."</span>
+    },
+    <span class="json-key">"factors"</span>: [
+      {
+        <span class="json-key">"kind"</span>: <span class="json-str">"counterparty"</span>,
+        <span class="json-key">"category_code"</span>: <span class="json-str">"medium_reputation_service"</span>,
+        <span class="json-key">"entity_class"</span>: <span class="json-str">"service"</span>,
+        <span class="json-key">"list_type"</span>: <span class="json-str">"operator_rating"</span>,
+        <span class="json-key">"entity"</span>: <span class="json-str">"Wirex"</span>,
+        <span class="json-key">"directness"</span>: <span class="json-str">"direct"</span>,
+        <span class="json-key">"hops"</span>: <span class="json-num">1</span>,
+        <span class="json-key">"share_pct"</span>: <span class="json-num">28.1</span>,
+        <span class="json-key">"amount_usd"</span>: <span class="json-num">41922.63</span>,
+        <span class="json-key">"denominator"</span>: <span class="json-str">"sampled_inflow_usd"</span>,
+        <span class="json-key">"denominator_value_usd"</span>: <span class="json-num">149190.85</span>,
+        <span class="json-key">"applied"</span>: <span class="json-bool">true</span>,
+        <span class="json-key">"effective_points"</span>: <span class="json-num">55.0</span>,
+        <span class="json-key">"source_count"</span>: <span class="json-num">387</span>,
+        <span class="json-key">"detail"</span>: <span class="json-str">"Counterparty is a service we rate as medium-reputation. Our own operator rating, not a sanctions match."</span>
+      }
+    ],
+    <span class="json-key">"excluded_below_threshold"</span>: {
+      <span class="json-key">"tainted_usd"</span>: <span class="json-num">0.0</span>,
+      <span class="json-key">"source_count"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"rule"</span>: <span class="json-str">"absolute_traced_value_usd"</span>
+    },
+    <span class="json-key">"funding"</span>: {
+      <span class="json-key">"scope"</span>: {
+        <span class="json-key">"describes"</span>: <span class="json-str">"address_inflows"</span>,
+        <span class="json-key">"per_transfer"</span>: <span class="json-bool">false</span>,
+        <span class="json-key">"max_transfers_sampled"</span>: <span class="json-num">200000</span>,
+        <span class="json-key">"window_seconds"</span>: <span class="json-num">18000000</span>,
+        <span class="json-key">"anchored_to"</span>: <span class="json-str">"address_last_activity"</span>,
+        <span class="json-key">"denominator"</span>: <span class="json-str">"sampled_inflow_usd"</span>,
+        <span class="json-key">"denominator_value"</span>: <span class="json-num">149190.85</span>
+      },
+      <span class="json-key">"distribution"</span>: [
+        {
+          <span class="json-key">"label"</span>: <span class="json-str">"Wirex"</span>,
+          <span class="json-key">"percentage"</span>: <span class="json-num">28.1</span>,
+          <span class="json-key">"share_pct_exact"</span>: <span class="json-num">28.10442</span>,
+          <span class="json-key">"value"</span>: <span class="json-num">41922.63</span>,
+          <span class="json-key">"category_code"</span>: <span class="json-str">"medium_reputation_service"</span>,
+          <span class="json-key">"entity_class"</span>: <span class="json-str">"service"</span>,
+          <span class="json-key">"risk_bearing"</span>: <span class="json-bool">true</span>,
+          <span class="json-key">"transfer_count"</span>: <span class="json-num">387</span>,
+          <span class="json-key">"denominator"</span>: <span class="json-str">"sampled_inflow_usd"</span>,
+          <span class="json-key">"denominator_value"</span>: <span class="json-num">149190.85</span>
+        }
+      ]
+    },
+    <span class="json-key">"entity_attribution"</span>: { <span class="json-key">"attribution"</span>: <span class="json-str">"none_held"</span> },
+    <span class="json-key">"jurisdiction_risk"</span>: { <span class="json-key">"listed_count"</span>: <span class="json-num">0</span> },
+    <span class="json-key">"related_entities"</span>: { <span class="json-key">"named_counterparty_count"</span>: <span class="json-num">1</span> }
+  },
+  <span class="json-key">"receiver_report"</span>: {
+    <span class="json-key">"address"</span>: <span class="json-str">"0x7547463fe4d6b3a5efc8540af5f7cc0665475bd8"</span>,
+    <span class="json-key">"report_id"</span>: <span class="json-str">"rpt_0b93ae51cc7f4428d6150e39ab77c214"</span>,
+    <span class="json-key">"status"</span>: <span class="json-str">"complete"</span>,
+    <span class="json-key">"coverage"</span>: <span class="json-str">"full"</span>,
+    <span class="json-key">"is_final"</span>: <span class="json-bool">true</span>,
+    <span class="json-key">"model_version"</span>: <span class="json-str">"4.3.0-da50fad0"</span>,
+    <span class="json-key">"data_version"</span>: <span class="json-str">"b866bd64"</span>,
+    <span class="json-key">"data_as_of"</span>: { <span class="json-key">"graph_covers_requested_block"</span>: <span class="json-bool">true</span>, <span class="json-key">"requested_block"</span>: <span class="json-num">23612901</span> },
+    <span class="json-key">"risk_score"</span>: <span class="json-num">24.75</span>,
+    <span class="json-key">"risk_level"</span>: <span class="json-str">"VERY LOW RISK"</span>,
+    <span class="json-key">"score_breakdown"</span>: { <span class="json-key">"score"</span>: <span class="json-num">24.75</span>, <span class="json-key">"decided_by"</span>: <span class="json-str">"activity_baseline"</span> },
+    <span class="json-key">"factors"</span>: [],
+    <span class="json-key">"funding"</span>: { <span class="json-key">"scope"</span>: { <span class="json-key">"per_transfer"</span>: <span class="json-bool">false</span> }, <span class="json-key">"distribution"</span>: [] }
+  }
+}</pre>
+
+      <h3>Example — one side not scored</h3>
+      <p>When the exposure graph has not yet reached the transfer's block, that side comes back <code>partial</code> with a <code>null</code> score. <strong>A <code>null</code> score is "not computed", never "low risk"</strong> — do not treat it as a pass.</p>
+      <pre>{
+  <span class="json-key">"version"</span>: <span class="json-str">"1.3.1"</span>,
+  <span class="json-key">"block_number"</span>: <span class="json-num">26232540</span>,
+  <span class="json-key">"confirmations"</span>: <span class="json-num">5</span>,
+  <span class="json-key">"event_index"</span>: <span class="json-num">95</span>,
+  <span class="json-key">"sender_risk_score"</span>: <span class="json-num">55</span>,
+  <span class="json-key">"receiver_risk_score"</span>: <span class="json-null">null</span>,
+  <span class="json-key">"receiver_report"</span>: {
+    <span class="json-key">"status"</span>: <span class="json-str">"partial"</span>,
+    <span class="json-key">"coverage"</span>: <span class="json-str">"activity_only"</span>,
+    <span class="json-key">"is_final"</span>: <span class="json-bool">false</span>,
+    <span class="json-key">"preliminary"</span>: <span class="json-bool">true</span>,
+    <span class="json-key">"reason"</span>: <span class="json-str">"GRAPH_BEHIND_REQUESTED_BLOCK"</span>,
+    <span class="json-key">"data_as_of"</span>: {
+      <span class="json-key">"graph_block"</span>: <span class="json-num">26231130</span>,
+      <span class="json-key">"requested_block"</span>: <span class="json-num">26232540</span>,
+      <span class="json-key">"graph_covers_requested_block"</span>: <span class="json-bool">false</span>
+    },
+    <span class="json-key">"risk_score"</span>: <span class="json-null">null</span>,
+    <span class="json-key">"risk_level"</span>: <span class="json-null">null</span>
+  }
 }</pre>
 
       <h3>curl Examples</h3>
