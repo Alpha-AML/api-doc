@@ -936,9 +936,14 @@ curl -H "X-apikey: &lt;key&gt;" \
                   Statistics, counterparties and related entities are all cut at this block.
                   Must be positive and at or below the indexed head, otherwise
                   <code>INVALID_BLOCK</code> / <code>BLOCK_IN_FUTURE</code>. If the exposure graph
-                  has not reached it, the report comes back <code>partial</code> with
-                  <code>GRAPH_BEHIND_REQUESTED_BLOCK</code> &mdash; activity is answerable, exposure
-                  is not.</td></tr>
+                  has not reached it the report comes back <code>partial</code>, with one of two reasons.
+                  <code>DEEP_TRACE_PENDING_EXPOSURE_CURRENT</code> means that block&rsquo;s exposure
+                  is already counted and only the full-depth trace is outstanding &mdash; the
+                  figure is usable and a retry gains nothing until the next full pass.
+                  <code>GRAPH_BEHIND_REQUESTED_BLOCK</code> means it is not covered yet &mdash;
+                  activity is answerable, exposure is not; retry in about ten minutes.
+                  <code>data_as_of.exposure_covers_requested_block</code> is the boolean form of
+                  the same distinction.</td></tr>
         </tbody>
       </table>
 
@@ -1288,7 +1293,7 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="section-box-header"><code>report</code> &mdash; identity, completeness and data freshness</div>
         <div class="field"><span class="field-name">report_id</span><span class="field-type">string</span><span class="field-desc">Identifies this result: <code>rpt_</code> + 32 hex. Deterministic &mdash; identical inputs return an identical id, and it changes whenever anything affecting the answer changes (new data, new model version, different <code>block</code>). Re-reading a finished report is therefore distinguishable from a fresh recalculation. Not a random UUID.</span></div>
         <div class="field"><span class="field-name">status</span><span class="field-type">string</span><span class="field-desc"><code>complete</code> &mdash; analysis ran in full. <code>partial</code> &mdash; a component was unavailable; the score is preliminary. <code>unavailable</code> &mdash; no analysis was performed. <strong>Branch on this before reading <code>score</code>.</strong></span></div>
-        <div class="field"><span class="field-name">reason</span><span class="field-type">string</span><span class="field-desc">Present only when <code>status != complete</code>. Current values: <code>CACHE_WARMING</code>, <code>GRAPH_BEHIND_REQUESTED_BLOCK</code>, <code>COUNTERPARTY_LOOKUP_FAILED</code>, <code>ENTITY_GEO_LOOKUP_FAILED</code>, <code>RELATED_ENTITIES_LOOKUP_FAILED</code>, <code>AGGREGATES_NOT_BUILT</code>. Treat unknown values as partial.</span></div>
+        <div class="field"><span class="field-name">reason</span><span class="field-type">string</span><span class="field-desc">Present only when <code>status != complete</code>. Current values: <code>CACHE_WARMING</code>, <code>DEEP_TRACE_PENDING_EXPOSURE_CURRENT</code>, <code>GRAPH_BEHIND_REQUESTED_BLOCK</code>, <code>COUNTERPARTY_LOOKUP_FAILED</code>, <code>ENTITY_GEO_LOOKUP_FAILED</code>, <code>RELATED_ENTITIES_LOOKUP_FAILED</code>, <code>AGGREGATES_NOT_BUILT</code>. Treat unknown values as partial. <strong><code>DEEP_TRACE_PENDING_EXPOSURE_CURRENT</code> is the one partial that needs no retry</strong>: the requested block&rsquo;s exposure is already counted and only the full-depth trace is outstanding, so re-querying before the next full pass gains nothing.</span></div>
         <div class="field"><span class="field-name">coverage</span><span class="field-type">string</span><span class="field-desc"><code>full</code> &mdash; the address has history and it was analysed. <code>no_history</code> &mdash; a valid address with zero transfers; distinct from "could not analyse". <code>partial_history</code> &mdash; history exists but was not fully covered.</span></div>
         <div class="field"><span class="field-name">is_final</span><span class="field-type">boolean</span><span class="field-desc">True only when <code>status = complete</code>. A final report is reproducible: identical inputs return a byte-identical payload.</span></div>
         <div class="field"><span class="field-name">preliminary</span><span class="field-type">boolean</span><span class="field-desc">Inverse of <code>is_final</code>. A preliminary score is never presented as final.</span></div>
