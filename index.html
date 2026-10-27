@@ -796,7 +796,7 @@ curl -H "X-apikey: &lt;key&gt;" \
     <span class="json-key">"coverage"</span>: <span class="json-str">&quot;full&quot;</span>,
     <span class="json-key">"is_final"</span>: <span class="json-bool">true</span>,
     <span class="json-key">"preliminary"</span>: <span class="json-bool">false</span>,
-    <span class="json-key">"model_version"</span>: <span class="json-str">&quot;4.2.0-da50fad0&quot;</span>,
+    <span class="json-key">"model_version"</span>: <span class="json-str">&quot;4.3.0-da50fad0&quot;</span>,
     <span class="json-key">"data_version"</span>: <span class="json-str">&quot;3780a61d&quot;</span>,
     <span class="json-key">"generated_at_utc"</span>: <span class="json-str">&quot;2026-10-21T16:36:25Z&quot;</span>,
     <span class="json-key">"data_as_of"</span>: {
@@ -806,7 +806,8 @@ curl -H "X-apikey: &lt;key&gt;" \
       <span class="json-key">"graph_utc"</span>: <span class="json-str">&quot;2026-10-21T03:32:59Z&quot;</span>,
       <span class="json-key">"graph_lag_blocks"</span>: <span class="json-num">3908</span>,
       <span class="json-key">"graph_lag_seconds"</span>: <span class="json-num">46992</span>,
-      <span class="json-key">"note"</span>: <span class="json-str">&quot;Activity is current to chain_head_block; graph exposure is current to graph_block. A transfer newer than graph_block is not yet in the exposure graph.&quot;</span>
+      <span class="json-key">"exposure_checked_to_chain_head"</span>: <span class="json-bool">true</span>,
+      <span class="json-key">"note"</span>: <span class="json-str">&quot;Activity is current to chain_head_block; traced exposure is current to graph_block. Value received after graph_block from addresses already known to be exposed is checked at request time and reported under risk_factors.post_graph_exposure; deeper paths opened by such a transfer are resolved at the next graph pass.&quot;</span>
     }
   },
   <span class="json-key">"wallet"</span>: {
@@ -984,6 +985,7 @@ curl -H "X-apikey: &lt;key&gt;" \
       <span class="json-key">"counterparty"</span>: <span class="json-num">100.0</span>,
       <span class="json-key">"indirect_exposure"</span>: <span class="json-num">0.75</span>,
       <span class="json-key">"concentration"</span>: <span class="json-num">0.0</span>,
+      <span class="json-key">"post_graph_exposure"</span>: <span class="json-num">0.0</span>,
       <span class="json-key">"activity_baseline"</span>: <span class="json-num">16.88</span>,
       <span class="json-key">"entity_penalty"</span>: <span class="json-num">75</span>,
       <span class="json-key">"geo_penalty"</span>: <span class="json-num">19</span>,
@@ -997,6 +999,21 @@ curl -H "X-apikey: &lt;key&gt;" \
       <span class="json-key">"decided_by_category"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
       <span class="json-key">"decided_by_list_type"</span>: <span class="json-str">&quot;sanctions&quot;</span>,
       <span class="json-key">"note"</span>: <span class="json-str">&quot;Components are not additive; the score is the strongest of them. decided_by names the one that set it; factors marked applied=false were found and reported but did not change the score.&quot;</span>
+    },
+    <span class="json-key">"post_graph_exposure"</span>: {
+      <span class="json-key">"status"</span>: <span class="json-str">&quot;none&quot;</span>,
+      <span class="json-key">"tainted_usd"</span>: <span class="json-num">0.0</span>,
+      <span class="json-key">"share_of_received_pct"</span>: <span class="json-num">0.0</span>,
+      <span class="json-key">"transfer_count"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"source_count"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"senders_examined"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"source_addresses"</span>: [],
+      <span class="json-key">"category_code"</span>: <span class="json-str">&quot;&quot;</span>,
+      <span class="json-key">"from_block"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"last_block"</span>: <span class="json-num">0</span>,
+      <span class="json-key">"last_utc"</span>: <span class="json-str">&quot;&quot;</span>,
+      <span class="json-key">"window"</span>: <span class="json-str">&quot;after graph_block, to chain_head_block&quot;</span>,
+      <span class="json-key">"note"</span>: <span class="json-str">&quot;Hop-1 only, limited to senders the last graph pass had already judged, to the largest senders_examined of them by value, and to priced assets. It is therefore a floor on exposure in this window, not the whole of it; the next pass traces the rest. An empty result means the window was examined and nothing matched.&quot;</span>
     },
     <span class="json-key">"excluded_below_threshold"</span>: {
       <span class="json-key">"tainted_usd"</span>: <span class="json-num">0.0</span>,
@@ -1106,7 +1123,7 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">coverage</span><span class="field-type">string</span><span class="field-desc"><code>full</code> &mdash; the address has history and it was analysed. <code>no_history</code> &mdash; a valid address with zero transfers; distinct from "could not analyse". <code>partial_history</code> &mdash; history exists but was not fully covered.</span></div>
         <div class="field"><span class="field-name">is_final</span><span class="field-type">boolean</span><span class="field-desc">True only when <code>status = complete</code>. A final report is reproducible: identical inputs return a byte-identical payload.</span></div>
         <div class="field"><span class="field-name">preliminary</span><span class="field-type">boolean</span><span class="field-desc">Inverse of <code>is_final</code>. A preliminary score is never presented as final.</span></div>
-        <div class="field"><span class="field-name">model_version</span><span class="field-type">string</span><span class="field-desc">Identifies the scoring model and its configuration, e.g. <code>4.1.0-da50fad0</code>. Two reports carrying the same value were produced by the same model against the same configuration. Changes when either changes.</span></div>
+        <div class="field"><span class="field-name">model_version</span><span class="field-type">string</span><span class="field-desc">Identifies the scoring model and its configuration, e.g. <code>4.3.0-da50fad0</code>. Two reports carrying the same value were produced by the same model against the same configuration. Changes when either changes.</span></div>
         <div class="field"><span class="field-name">generated_at_utc</span><span class="field-type">string</span><span class="field-desc">ISO-8601 UTC timestamp of this response.</span></div>
         <div class="field"><span class="field-name">as_of_block</span><span class="field-type">integer</span><span class="field-desc">Echo of the <code>block</code> parameter. Present only when a point-in-time query was requested.</span></div>
         <div class="field"><span class="field-name">data_as_of.chain_head_block</span><span class="field-type">integer</span><span class="field-desc">Highest block indexed for this network.</span></div>
@@ -1115,6 +1132,8 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">data_as_of.chain_head_utc</span><span class="field-type">string</span><span class="field-desc">ISO-8601 UTC of <code>chain_head_block</code>.</span></div>
         <div class="field"><span class="field-name">data_as_of.graph_utc</span><span class="field-type">string</span><span class="field-desc">ISO-8601 UTC of <code>graph_block</code>.</span></div>
         <div class="field"><span class="field-name">data_as_of.graph_lag_seconds</span><span class="field-type">integer</span><span class="field-desc">Head minus graph in SECONDS, or <code>-1</code> when unknown. A lag in blocks is not comparable across networks - Ethereum settles every ~12 s, Tron every ~3 s - so a deposit-freshness decision should use this.</span></div>
+        <div class="field"><span class="field-name">data_as_of.exposure_raised_to_block</span><span class="field-type">integer</span><span class="field-desc">Present only when stored exposure has been brought forward past <code>graph_block</code> by an incremental pass, with <code>exposure_raised_to_utc</code> beside it. Not the same claim as <code>graph_block</code>: that one means traced to full depth, this one means raised where value from a known source arrived.</span></div>
+        <div class="field"><span class="field-name">data_as_of.exposure_checked_to_chain_head</span><span class="field-type">boolean</span><span class="field-desc">Whether value received after <code>graph_block</code> was examined at request time. When <code>true</code>, a deposit newer than the graph is not simply missing from the assessment &mdash; see <code>risk_factors.post_graph_exposure</code>.</span></div>
         <div class="field"><span class="field-name">data_as_of.graph_covers_requested_block</span><span class="field-type">boolean</span><span class="field-desc">Present only when <code>block</code> was supplied. Whether the exposure graph had reached that block. <code>false</code> means activity is answerable and exposure is not.</span></div>
         <div class="field"><span class="field-name">data_version</span><span class="field-type">string</span><span class="field-desc">Version of the reference DATA, separate from <code>model_version</code>. Label and sanctions data move independently of the code, so a rerun after a sync can differ from the same model. Two reports sharing both versions were computed from the same code, settings and reference data.</span></div>
       </div>
@@ -1220,6 +1239,7 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">counterparty</span><span class="field-type">number</span><span class="field-desc">Contribution from who funded it directly.</span></div>
         <div class="field"><span class="field-name">indirect_exposure</span><span class="field-type">number</span><span class="field-desc">Contribution from value traced through the graph.</span></div>
         <div class="field"><span class="field-name">concentration</span><span class="field-type">number</span><span class="field-desc">Contribution from how concentrated that exposure is.</span></div>
+        <div class="field"><span class="field-name">post_graph_exposure</span><span class="field-type">number</span><span class="field-desc">Contribution from value received after <code>data_as_of.graph_block</code> from addresses the graph had already judged. Checked at request time, so a deposit that arrived since the last graph pass is scored rather than invisible.</span></div>
         <div class="field"><span class="field-name">activity_baseline</span><span class="field-type">number</span><span class="field-desc">Baseline from activity alone. An address nothing is known against is unexamined, not cleared, so this is never zero for an active address.</span></div>
         <div class="field"><span class="field-name">entity_penalty</span><span class="field-type">integer</span><span class="field-desc">Added for risk carried by the linked company or person.</span></div>
         <div class="field"><span class="field-name">geo_penalty</span><span class="field-type">integer</span><span class="field-desc">Added for jurisdiction risk.</span></div>
@@ -1229,10 +1249,38 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">service_basis</span><span class="field-type">string</span><span class="field-desc">Why that determination was made, e.g. <code>named service</code>, <code>high-throughput service</code>, <code>not a service</code>.</span></div>
         <div class="field"><span class="field-name">score</span><span class="field-type">number</span><span class="field-desc">The final score, repeated for convenience.</span></div>
         <div class="field"><span class="field-name">degraded_lookups[]</span><span class="field-type">array</span><span class="field-desc">Components that failed. Non-empty implies <code>status: partial</code>. A failed lookup lowers the score mechanically, so it must not be read as a cleaner address.</span></div>
-        <div class="field"><span class="field-name">decided_by</span><span class="field-type">string</span><span class="field-desc">Which component set the score: <code>direct_listing</code>, <code>counterparty</code>, <code>indirect_exposure</code>, <code>activity_baseline</code>, <code>contract_allowlist</code> or <code>none</code>.</span></div>
+        <div class="field"><span class="field-name">decided_by</span><span class="field-type">string</span><span class="field-desc">Which component set the score: <code>direct_listing</code>, <code>counterparty</code>, <code>indirect_exposure</code>, <code>post_graph_exposure</code>, <code>activity_baseline</code>, <code>contract_allowlist</code> or <code>none</code>.</span></div>
         <div class="field"><span class="field-name">decided_by_category</span><span class="field-type">string</span><span class="field-desc">Category code of the deciding finding.</span></div>
         <div class="field"><span class="field-name">decided_by_list_type</span><span class="field-type">string</span><span class="field-desc">List type of the deciding finding. <code>operator_rating</code> means our own rating of a service, NOT a sanctions match.</span></div>
         <div class="field"><span class="field-name">note</span><span class="field-type">string</span><span class="field-desc"><strong>Components are not additive &mdash; the score is not their sum.</strong></span></div>
+      </div>
+
+      <div class="section-box">
+        <div class="section-box-header"><code>risk_factors.post_graph_exposure</code> &mdash; exposure newer than the graph</div>
+        <div class="field"><span class="field-name">status</span><span class="field-type">string</span><span class="field-desc"><code>found</code>, <code>none</code>, <code>unavailable</code> or <code>not_applicable</code>. <code>none</code> means the window was examined and nothing matched &mdash; not that it was skipped. <code>unavailable</code> means the check did not complete: the score is a floor, <code>report.status</code> is <code>partial</code>, and <strong>it must not be read as a low-risk answer</strong>. <code>not_applicable</code> means it was not examined, and <code>not_applicable_reason</code> says why; today the only reason is <code>address_is_a_contract</code>, a contract being assessed as machinery rather than as a counterparty.</span></div>
+        <div class="field"><span class="field-name">tainted_usd</span><span class="field-type">number</span><span class="field-desc">Value received after <code>graph_block</code> attributable to illicit origin, counted proportionally: a sender that is 2&nbsp;% contaminated contributes 2&nbsp;% of what it sent.</span></div>
+        <div class="field"><span class="field-name">share_of_received_pct</span><span class="field-type">number</span><span class="field-desc">That amount as a percentage of total received value, so it is comparable with the graph's own shares.</span></div>
+        <div class="field"><span class="field-name">transfer_count</span><span class="field-type">integer</span><span class="field-desc">How many transfers in this window came from such senders.</span></div>
+        <div class="field"><span class="field-name">source_count</span><span class="field-type">integer</span><span class="field-desc">How many distinct senders. <code>source_addresses[]</code> lists up to 20 of them.</span></div>
+        <div class="field"><span class="field-name">senders_examined</span><span class="field-type">integer</span><span class="field-desc">How many senders in this window were checked, largest by value first.</span></div>
+        <div class="field"><span class="field-name">category_code</span><span class="field-type">string</span><span class="field-desc">Category of the worst origin behind those senders, from the same dictionary as every other factor.</span></div>
+        <div class="field"><span class="field-name">from_block / last_block / last_utc</span><span class="field-type">integer, string</span><span class="field-desc">The window actually covered, and when the most recent such transfer landed.</span></div>
+        <div class="field"><span class="field-name">note</span><span class="field-type">string</span><span class="field-desc">The limits, stated: one hop, senders the last graph pass had already judged, the largest of them by value, priced assets only. It is a floor on exposure in this window, and the next graph pass resolves the rest.</span></div>
+        <p>Populated example &mdash; <code>0xb6ef1290065488a40322033ceecca50c18414d86</code>, whose entire funding history is one transfer received after the last graph pass, from an address the graph already held at severity 90. It scores 90 on that alone, and <code>decided_by</code> is <code>post_graph_exposure</code>:</p>
+        <pre>{
+  <span class="json-key">"status"</span>: <span class="json-str">&quot;found&quot;</span>,
+  <span class="json-key">"tainted_usd"</span>: <span class="json-num">544.0</span>,
+  <span class="json-key">"share_of_received_pct"</span>: <span class="json-num">100.0</span>,
+  <span class="json-key">"transfer_count"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"source_count"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"senders_examined"</span>: <span class="json-num">1</span>,
+  <span class="json-key">"source_addresses"</span>: [<span class="json-str">&quot;0x0ba9bf6ece534ef7d43ec50f6f08c899ddecebbe&quot;</span>],
+  <span class="json-key">"category_code"</span>: <span class="json-str">&quot;issuer_freeze&quot;</span>,
+  <span class="json-key">"from_block"</span>: <span class="json-num">26249051</span>,
+  <span class="json-key">"last_block"</span>: <span class="json-num">26249051</span>,
+  <span class="json-key">"last_utc"</span>: <span class="json-str">&quot;2026-10-22T15:27:59Z&quot;</span>,
+  <span class="json-key">"window"</span>: <span class="json-str">&quot;after graph_block, to chain_head_block&quot;</span>
+}</pre>
       </div>
 
       <div class="section-box">
@@ -1371,7 +1419,7 @@ curl -H "X-apikey: &lt;key&gt;" \
         <div class="field"><span class="field-name">6</span><span class="field-type">warn</span><span class="field-desc"><code>coverage = "no_history"</code>. Unexamined, not proven clean.</span></div>
         <div class="field"><span class="field-name">7</span><span class="field-type">note</span><span class="field-desc">Use <code>score</code>, never <code>risk_level</code>, in logic &mdash; there is no <em>MEDIUM</em> label, so 41&ndash;50 reads <code>LOW RISK</code>. Classify with <code>score_zones[].min_inclusive</code> / <code>max_exclusive</code>.</span></div>
         <div class="field"><span class="field-name">8</span><span class="field-type">note</span><span class="field-desc">Do not compare <code>share_pct</code> across factors &mdash; the bases differ. Divide <code>amount_usd</code> by <code>denominator_value_usd</code> instead.</span></div>
-        <div class="field"><span class="field-name">9</span><span class="field-type">note</span><span class="field-desc">For deposit screening, check <code>data_as_of.graph_lag_seconds</code>: a transfer newer than <code>graph_block</code> is not yet in the exposure graph, even when <code>status</code> is <code>complete</code>.</span></div>
+        <div class="field"><span class="field-name">9</span><span class="field-type">note</span><span class="field-desc">For deposit screening, check <code>data_as_of.graph_lag_seconds</code> for how far the traced graph reaches, and <code>risk_factors.post_graph_exposure</code> for what was found after it at request time. A transfer newer than <code>graph_block</code> has not been traced to full depth, but value received from an address already known to be exposed is still counted.</span></div>
       </div>
 
     </section>
